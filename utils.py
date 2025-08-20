@@ -110,15 +110,24 @@ async def update_user_data(client, me, folder):
 
     async for dialog in client.iter_dialogs():
         entity = dialog.entity
-        if not isinstance(entity, (User, Chat, Channel)):
+        if not hasattr(entity, "id"):
             continue
-        chat_name = getattr(entity, "title", None) or getattr(entity, "first_name", None)
+
+        chat_name = getattr(entity, "title", None) or getattr(entity, "first_name", None) or "Unknown"
         chat_slug = slugify(f"{chat_name}_{entity.id}")
         chat_id_db = await save_chat_to_db(user_id, entity.id, chat_name, chat_slug)
 
+        batch_size = 50
         tasks = []
-        async for msg in client.iter_messages(entity, limit=100):
+        count = 0
+
+        async for msg in client.iter_messages(entity, limit=None):
             tasks.append(process_and_save_message(msg, chat_id_db, folder, username))
+            count += 1
+            if count % batch_size == 0:
+                await asyncio.gather(*tasks)
+                tasks = []
+
         if tasks:
             await asyncio.gather(*tasks)
 
