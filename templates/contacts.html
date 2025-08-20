@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Contacts of {{ user_folder }}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #f4f6f9;
+            margin: 0;
+            padding: 40px;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            font-size: 32px;
+            margin-bottom: 30px;
+        }
+        .contacts-container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        thead {
+            background: #007bff;
+            color: white;
+        }
+        th, td {
+            padding: 14px 18px;
+            text-align: left;
+            font-size: 15px;
+        }
+        th {
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        tr:nth-child(even) {
+            background: #f8f9fb;
+        }
+        tr:hover {
+            background: #eef4ff;
+            transition: background 0.2s ease-in-out;
+        }
+        td {
+            color: #2c3e50;
+        }
+        td:first-child {
+            font-weight: bold;
+            color: #007bff;
+        }
+        .username {
+            color: #0056b3;
+            font-weight: 500;
+        }
+        .phone {
+            font-family: monospace;
+            color: #16a085;
+        }
+    </style>
+</head>
+<body>
+    <h1>Contacts of {{ user_folder }}</h1>
+    <div class="contacts-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Username</th>
+                    <th>First Name</th>
+                    <th>Last Name</th>
+                    <th>Phone</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in contacts %}
+                <tr>
+                    <td>{{ c['tg_id'] }}</td>
+                    <td class="username">@{{ c['username'] or "—" }}</td>
+                    <td>{{ c['first_name'] or "" }}</td>
+                    <td>{{ c['last_name'] or "" }}</td>
+                    <td class="phone">{{ c['phone'] or "N/A" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

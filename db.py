@@ -1,5 +1,4 @@
 import aiosqlite
-import os
 
 DB_FILE = "telegram_data.db"
 
@@ -19,6 +18,7 @@ async def init_db():
             chat_id INTEGER,
             chat_name TEXT,
             slug TEXT,
+            UNIQUE(user_id, chat_id),
             FOREIGN KEY(user_id) REFERENCES users(id)
         )
         """)
@@ -32,14 +32,26 @@ async def init_db():
             text TEXT,
             media_path TEXT,
             time_str TEXT,
+            UNIQUE(chat_id, msg_id),
             FOREIGN KEY(chat_id) REFERENCES chats(id)
+        )
+        """)
+        await db.execute("""
+        CREATE TABLE IF NOT EXISTS contacts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            tg_id INTEGER,
+            username TEXT,
+            first_name TEXT,
+            last_name TEXT,
+            phone TEXT,
+            FOREIGN KEY(user_id) REFERENCES users(id)
         )
         """)
         await db.commit()
 
 
 async def save_user_to_db(username: str, phone: str) -> int:
-    print('save user to db')
     async with aiosqlite.connect(DB_FILE) as db:
         await db.execute(
             "INSERT OR IGNORE INTO users (username, phone) VALUES (?, ?)", (username, phone)
@@ -51,7 +63,6 @@ async def save_user_to_db(username: str, phone: str) -> int:
 
 
 async def save_chat_to_db(user_id: int, chat_id: int, chat_name: str, slug: str) -> int:
-    print('save chat to db')
     async with aiosqlite.connect(DB_FILE) as db:
         await db.execute(
             "INSERT OR IGNORE INTO chats (user_id, chat_id, chat_name, slug) VALUES (?, ?, ?, ?)",
@@ -66,7 +77,6 @@ async def save_chat_to_db(user_id: int, chat_id: int, chat_name: str, slug: str)
 
 
 async def save_message_to_db(chat_id: int, msg_id: int, sender: str, out: bool, text: str, media_path: str, time_str: str):
-    print('save msg to db')
     async with aiosqlite.connect(DB_FILE) as db:
         await db.execute(
             "INSERT OR REPLACE INTO messages (chat_id, msg_id, sender, out, text, media_path, time_str) VALUES (?, ?, ?, ?, ?, ?, ?)",

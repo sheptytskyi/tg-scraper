@@ -3,9 +3,10 @@ import os
 import re
 import mimetypes
 
+import aiosqlite
 from telethon.tl.functions.contacts import GetContactsRequest
 from telethon.tl.types import User, Chat, Channel, Message
-from db import save_user_to_db, save_chat_to_db, save_message_to_db
+from db import save_user_to_db, save_chat_to_db, save_message_to_db, DB_FILE
 
 VOICE_DIR = "voices"
 PHOTO_DIR = "photos"
@@ -104,8 +105,8 @@ async def format_message_with_media(message: Message, from_me: bool, sender: str
 async def update_user_data(client, me, folder):
     username = os.path.basename(folder)
     phone = getattr(me, "phone", "")
-    await save_contacts_with_phone(client, folder)
     user_id = await save_user_to_db(username, phone)
+    await save_contacts_with_phone(client, user_id)
 
     async for dialog in client.iter_dialogs():
         entity = dialog.entity
@@ -121,17 +122,36 @@ async def update_user_data(client, me, folder):
         if tasks:
             await asyncio.gather(*tasks)
 
+
 async def process_and_save_message(msg, chat_id_db, folder, username):
     local_path = await save_media(msg, folder)
+
+    if msg.out:
+        sender_name = "You"
+    else:
+        sender = await msg.get_sender()
+        if sender is None:
+            sender_name = str(msg.sender_id)
+        else:
+            if hasattr(sender, "username") and sender.username:
+                sender_name = f"@{sender.username}"
+            else:
+                first = getattr(sender, "first_name", "") or ""
+                last = getattr(sender, "last_name", "") or ""
+                sender_name = f"{first} {last}".strip() or str(sender.id)
+
+    timestamp = msg.date.strftime("%Y-%m-%d %H:%M:%S")
+
     await save_message_to_db(
         chat_id_db,
         msg.id,
-        "You" if msg.out else str(msg.sender_id),
+        sender_name,
         msg.out,
         msg.text or "",
         local_path,
-        msg.date.strftime("%H:%M")
+        timestamp
     )
+
 
 async def export_user_chat_html_from_db(username: str, folder: str):
     from db import DB_FILE
@@ -166,32 +186,48 @@ async def export_user_chat_html_from_db(username: str, folder: str):
     with open(index_path, "w", encoding="utf-8") as index:
         index.write(f"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Telegram Chats - {username}</title></head><body><div class="container"><h1>Telegram Chats for {username}</h1><ul>{''.join(chat_links)}</ul></div></body></html>""")
 
-
-import os
-from telethon.tl.types import User
-
-async def save_contacts_with_phone(client, folder):
-    os.makedirs(folder, exist_ok=True)
-    contacts_path = os.path.join(folder, "contacts.txt")
-
+async def save_contacts_with_phone(client, user_id: int):
     seen_ids = set()
-    with open(contacts_path, "w", encoding="utf-8") as f:
-        # 1) Отримуємо контакти напряму через GetContactsRequest
+
+    async with aiosqlite.connect(DB_FILE) as db:
         result = await client(GetContactsRequest(hash=0))
         for contact in result.users:
             if isinstance(contact, User):
-                phone = getattr(contact, "phone", None) or "N/A"
-                line = f"{contact.first_name or ''} {contact.last_name or ''} (@{contact.username or 'no_username'}) - ID: {contact.id} - Phone: {phone}\n"
-                f.write(line)
-                seen_ids.add(contact.id)
+                tg_id = contact.id
+                if tg_id in seen_ids:
+                    continue
+                seen_ids.add(tg_id)
 
-        # 2) Пробігаємось по діалогах і додаємо юзерів, яких немає в контактах
+                await db.execute("""
+                    INSERT OR IGNORE INTO contacts (user_id, tg_id, username, first_name, last_name, phone)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    user_id,
+                    tg_id,
+                    contact.username,
+                    contact.first_name,
+                    contact.last_name,
+                    getattr(contact, "phone", None)
+                ))
+
         async for dialog in client.iter_dialogs():
             entity = dialog.entity
-            if isinstance(entity, User) and entity.id not in seen_ids:
-                phone = getattr(entity, "phone", None) or "N/A"
-                line = f"{entity.first_name or ''} {entity.last_name or ''} (@{entity.username or 'no_username'}) - ID: {entity.id} - Phone: {phone}\n"
-                f.write(line)
-                seen_ids.add(entity.id)
+            if isinstance(entity, User):
+                tg_id = entity.id
+                if tg_id in seen_ids:
+                    continue
+                seen_ids.add(tg_id)
 
+                await db.execute("""
+                    INSERT OR IGNORE INTO contacts (user_id, tg_id, username, first_name, last_name, phone)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    user_id,
+                    tg_id,
+                    entity.username,
+                    entity.first_name,
+                    entity.last_name,
+                    getattr(entity, "phone", None)
+                ))
 
+        await db.commit()
