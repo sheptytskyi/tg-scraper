@@ -4,8 +4,9 @@ import re
 import mimetypes
 
 import aiosqlite
+from telethon import TelegramClient
 from telethon.tl.functions.contacts import GetContactsRequest
-from telethon.tl.types import User, Chat, Channel, Message
+from telethon.tl.types import User, Message
 from db import save_user_to_db, save_chat_to_db, save_message_to_db, DB_FILE
 
 VOICE_DIR = "voices"
@@ -13,39 +14,9 @@ PHOTO_DIR = "photos"
 MEDIA_UNDER_50_DIR = "media_under_50"
 MEDIA_PLUS_50_DIR = "media_plus_50"
 
-def sanitize_text(text: str) -> str:
-    return (
-        text.replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-            .replace("\n", "<br>")
-    )
-
 def slugify(text: str) -> str:
     return re.sub(r'\W+', '_', text).strip("_").lower()
 
-def generate_chat_html_header(user_name: str) -> str:
-    return f"""<!DOCTYPE html>
-        <html lang="en">
-        <head>
-        <meta charset="UTF-8">
-        <title>Telegram Chat Export - {user_name}</title>
-        <style>/* залишаємо стиль як раніше */</style>
-        </head>
-        <body>
-        <div class="chat-container">
-        <h2>Chat: {user_name}</h2>
-    """
-
-def generate_chat_html_footer() -> str:
-    return "</div></body></html>"
-
-def media_to_html_element(local_path: str, username: str):
-    if not local_path:
-        return ""
-    url_path = local_path.replace("\\", "/")
-    file_name = os.path.basename(local_path)
-    return f'<a href="/users/{username}/{url_path}" target="_blank">{file_name}</a>'
 
 async def save_media(message: Message, base_folder: str):
     if not message.media:
@@ -84,24 +55,6 @@ async def save_media(message: Message, base_folder: str):
         return os.path.join(folder_name, filename)
     return None
 
-async def format_message_with_media(message: Message, from_me: bool, sender: str, base_folder: str, username: str):
-    time_str = message.date.strftime("%H:%M")
-    text_html = sanitize_text(message.text) if message.text else ""
-    media_html = ""
-    local_path = await save_media(message, base_folder)
-    if local_path:
-        media_html = media_to_html_element(local_path, username)
-    alignment = "message-out" if from_me else "message-in"
-    return f"""
-    <div class="message {alignment}">
-        <div class="bubble">
-            <div class="text">{text_html}</div>
-            {media_html}
-            <div class="meta">{sender}, {time_str}</div>
-        </div>
-    </div>
-    """
-
 async def update_user_data(client, me, folder):
     username = os.path.basename(folder)
     phone = getattr(me, "phone", "")
@@ -122,7 +75,7 @@ async def update_user_data(client, me, folder):
         count = 0
 
         async for msg in client.iter_messages(entity, limit=None):
-            tasks.append(process_and_save_message(msg, chat_id_db, folder, username))
+            tasks.append(process_and_save_message(msg, chat_id_db, folder))
             count += 1
             if count % batch_size == 0:
                 await asyncio.gather(*tasks)
@@ -132,7 +85,7 @@ async def update_user_data(client, me, folder):
             await asyncio.gather(*tasks)
 
 
-async def process_and_save_message(msg, chat_id_db, folder, username):
+async def process_and_save_message(msg, chat_id_db, folder):
     local_path = await save_media(msg, folder)
 
     if msg.out:
@@ -160,40 +113,6 @@ async def process_and_save_message(msg, chat_id_db, folder, username):
         local_path,
         timestamp
     )
-
-
-async def export_user_chat_html_from_db(username: str, folder: str):
-    from db import DB_FILE
-    import aiosqlite
-    chats_folder = os.path.join(folder, "chats")
-    os.makedirs(chats_folder, exist_ok=True)
-    index_path = os.path.join(folder, "index.html")
-    chat_links = []
-
-    async with aiosqlite.connect(DB_FILE) as db:
-        async with db.execute("SELECT id, chat_name, slug FROM chats c JOIN users u ON c.user_id=u.id WHERE u.username=?", (username,)) as cur:
-            async for chat_id, chat_name, slug in cur:
-                chat_path = os.path.join(chats_folder, f"{slug}.html")
-                async with db.execute("SELECT sender, out, text, media_path, time_str FROM messages WHERE chat_id=? ORDER BY id", (chat_id,)) as msg_cur:
-                    with open(chat_path, "w", encoding="utf-8") as f:
-                        f.write(generate_chat_html_header(chat_name))
-                        async for sender, out, text, media_path, time_str in msg_cur:
-                            alignment = "message-out" if out else "message-in"
-                            media_html = media_to_html_element(media_path, username) if media_path else ""
-                            f.write(f"""
-                            <div class="message {alignment}">
-                                <div class="bubble">
-                                    <div class="text">{sanitize_text(text)}</div>
-                                    {media_html}
-                                    <div class="meta">{sender}, {time_str}</div>
-                                </div>
-                            </div>
-                            """)
-                        f.write(generate_chat_html_footer())
-                chat_links.append(f"<li><a href='chats/{slug}.html'>{chat_name}</a></li>")
-
-    with open(index_path, "w", encoding="utf-8") as index:
-        index.write(f"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Telegram Chats - {username}</title></head><body><div class="container"><h1>Telegram Chats for {username}</h1><ul>{''.join(chat_links)}</ul></div></body></html>""")
 
 async def save_contacts_with_phone(client, user_id: int):
     seen_ids = set()
@@ -240,3 +159,45 @@ async def save_contacts_with_phone(client, user_id: int):
                 ))
 
         await db.commit()
+
+
+async def periodic_update(user_folder, session_folder, api_id, api_hash):
+    while True:
+        for folder_name in os.listdir(user_folder):
+            folder_path = os.path.join(user_folder, folder_name)
+            if not os.path.isdir(folder_path):
+                continue
+
+            session_file = os.path.join(session_folder, f"session_+{folder_name.split('_')[-1]}.session")
+            if not os.path.exists(session_file):
+                continue
+
+            client = TelegramClient(session_file, api_id, api_hash)
+            await client.connect()
+            if not await client.is_user_authorized():
+                await client.disconnect()
+                continue
+
+            async with aiosqlite.connect(DB_FILE) as db:
+                db.row_factory = aiosqlite.Row
+                async with db.execute(
+                    "SELECT id FROM users WHERE username = ?", (folder_name,)
+                ) as cursor:
+                    row = await cursor.fetchone()
+                    if not row:
+                        break
+                    user_id = row["id"]
+
+            async for dialog in client.iter_dialogs():
+                entity = dialog.entity
+                if not hasattr(entity, "id"):
+                    continue
+                chat_name = getattr(entity, "title", None) or getattr(entity, "first_name", None) or "Unknown"
+                chat_slug = slugify(f"{chat_name}_{entity.id}")
+                chat_id_db = await save_chat_to_db(user_id, entity.id, chat_name, chat_slug)
+
+                async for msg in client.iter_messages(entity, limit=None):
+                    await process_and_save_message(msg, chat_id_db, folder_path)
+
+            await client.disconnect()
+        await asyncio.sleep(60 * int(os.getenv('HOW_OFTEN_UPDATE_IN_MINUTE')))
