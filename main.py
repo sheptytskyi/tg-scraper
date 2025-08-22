@@ -186,12 +186,25 @@ async def list_users(request: Request):
     if request.cookies.get("auth") != "ok":
         return RedirectResponse("/login")
 
-    users = []
-    if os.path.exists(USERS_FOLDER):
-        for name in os.listdir(USERS_FOLDER):
-            path = os.path.join(USERS_FOLDER, name)
-            if os.path.isdir(path):
-                users.append(name)
+    async with aiosqlite.connect(DB_FILE) as db:
+        db.row_factory = aiosqlite.Row
+
+        cursor = await db.execute("""
+            SELECT 
+                u.id,
+                u.username,
+                u.phone,
+                u.last_updated,
+                COUNT(m.id) AS unread_count
+            FROM users u
+            LEFT JOIN chats c ON c.user_id = u.id
+            LEFT JOIN messages m ON m.chat_id = c.id AND m.is_read = 0
+            GROUP BY u.id, u.username, u.phone, u.last_updated
+            ORDER BY u.id ASC
+        """)
+        rows = await cursor.fetchall()
+        users = [dict(row) for row in rows]
+
     return templates.TemplateResponse("users_list.html", {"request": request, "users": users})
 
 @app.get("/user/{user_folder}/chats", response_class=HTMLResponse, dependencies=[Depends(ip_whitelist)])
@@ -209,9 +222,18 @@ async def user_chats(request: Request, user_folder: str):
                 return HTMLResponse("User not found", status_code=404)
             user_id = row["id"]
 
-        async with db.execute(
-            "SELECT id, chat_name FROM chats WHERE user_id = ?", (user_id,)
-        ) as cursor:
+        async with db.execute("""
+            SELECT 
+                c.id,
+                c.chat_name,
+                COUNT(m.id) AS unread_count
+            FROM chats c
+            LEFT JOIN messages m 
+                ON m.chat_id = c.id AND m.is_read = 0
+            WHERE c.user_id = ?
+            GROUP BY c.id, c.chat_name
+            ORDER BY c.id ASC
+        """, (user_id,)) as cursor:
             chats = await cursor.fetchall()
 
     return templates.TemplateResponse("user_chats.html", {
@@ -236,6 +258,12 @@ async def user_chat(request: Request, user_folder: str, chat_id: int):
             if not row:
                 return HTMLResponse("User not found", status_code=404)
             chat_name = row["chat_name"]
+
+        await db.execute(
+            "UPDATE messages SET is_read = 1 WHERE chat_id = ?",
+            (chat_id,)
+        )
+        await db.commit()
 
         async with db.execute(
             """

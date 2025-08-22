@@ -55,6 +55,9 @@
             border-radius: 12px;
             box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
             transition: all 0.2s ease-in-out;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         li:hover {
             transform: translateY(-3px);
@@ -70,6 +73,24 @@
         a:hover {
             color: #0056b3;
         }
+        .badge {
+            background: red;
+            color: white;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: bold;
+        }
+        .badge.wide {
+            border-radius: 12px; /* замість повного кола робимо "пігулку" */
+            padding: 0 6px;
+            width: auto;
+            min-width: 24px;
+        }
     </style>
 </head>
 <body>
@@ -79,7 +100,18 @@
     </div>
     <ul>
     {% for chat in chats %}
-        <li><a href="/user/{{ user_folder }}/chats/{{ chat.id }}/">{{ chat.chat_name }}</a></li>
+        <li>
+            <a href="/user/{{ user_folder }}/chats/{{ chat.id }}/">{{ chat.chat_name }}</a>
+            {% if chat.unread_count and chat.unread_count > 0 %}
+                {% if chat.unread_count > 99 %}
+                    <span class="badge wide">99+</span>
+                {% elif chat.unread_count > 9 %}
+                    <span class="badge wide">{{ chat.unread_count }}</span>
+                {% else %}
+                    <span class="badge">{{ chat.unread_count }}</span>
+                {% endif %}
+            {% endif %}
+        </li>
     {% endfor %}
     </ul>
 </body>

@@ -30,6 +30,9 @@
             border-radius: 12px;
             box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
             transition: all 0.2s ease-in-out;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         li:hover {
             transform: translateY(-3px);
@@ -40,20 +43,52 @@
             color: #007bff;
             font-size: 18px;
             font-weight: 500;
-            display: block;
         }
         a:hover {
             color: #0056b3;
+        }
+        .badge {
+            background: red;
+            color: white;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: bold;
+        }
+        .badge.wide {
+            border-radius: 12px;
+            padding: 0 6px;
+            width: auto;
+            min-width: 24px;
         }
     </style>
 </head>
 <body>
     <h1>Users</h1>
     <ul>
-    {% for user in users %}
-        <li><a href="/user/{{ user }}/chats">{{ user }}</a></li>
-    {% endfor %}
+        {% for user in users %}
+            <li>
+                <div>
+                    <a href="/user/{{ user.username }}/chats">{{ user.username }}</a>
+                    {% if user.last_updated %}
+                        <span style="font-size:12px; color:#666; margin-left:8px;">({{ user.last_updated }})</span>
+                    {% endif %}
+                </div>
+                {% if user.unread_count and user.unread_count > 0 %}
+                    {% if user.unread_count > 99 %}
+                        <span class="badge wide">99+</span>
+                    {% elif user.unread_count > 9 %}
+                        <span class="badge wide">{{ user.unread_count }}</span>
+                    {% else %}
+                        <span class="badge">{{ user.unread_count }}</span>
+                    {% endif %}
+                {% endif %}
+            </li>
+        {% endfor %}
     </ul>
 </body>
 </html>
-

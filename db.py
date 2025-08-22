@@ -1,3 +1,6 @@
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 import aiosqlite
 
 DB_FILE = "telegram_data.db"
@@ -8,7 +11,8 @@ async def init_db():
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE,
-            phone TEXT
+            phone TEXT,
+            last_updated TEXT
         )
         """)
         await db.execute("""
@@ -32,6 +36,7 @@ async def init_db():
             text TEXT,
             media_path TEXT,
             time_str TEXT,
+            is_read BOOLEAN DEFAULT 0,
             UNIQUE(chat_id, msg_id),
             FOREIGN KEY(chat_id) REFERENCES chats(id)
         )
@@ -78,8 +83,19 @@ async def save_chat_to_db(user_id: int, chat_id: int, chat_name: str, slug: str)
 
 async def save_message_to_db(chat_id: int, msg_id: int, sender: str, out: bool, text: str, media_path: str, time_str: str):
     async with aiosqlite.connect(DB_FILE) as db:
-        await db.execute(
-            "INSERT OR REPLACE INTO messages (chat_id, msg_id, sender, out, text, media_path, time_str) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        # Вставляємо повідомлення
+        cursor = await db.execute(
+            "INSERT OR IGNORE INTO messages (chat_id, msg_id, sender, out, text, media_path, time_str) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (chat_id, msg_id, sender, out, text, media_path, time_str)
         )
+
+        # Перевіряємо, чи реально додано рядок
+        if cursor.rowcount > 0:
+            now = datetime.now(ZoneInfo("Europe/Kiev")).strftime("%Y-%m-%d %H:%M:%S")
+            await db.execute("""
+                UPDATE users
+                SET last_updated = ?
+                WHERE id = (SELECT user_id FROM chats WHERE id = ?)
+            """, (now, chat_id))
+
         await db.commit()
