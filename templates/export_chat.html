@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Chat with {{ chat_name }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #e5ddd5;
+            margin: 0;
+            padding: 0;
+        }
+        .chat-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .message {
+            display: inline-block;
+            clear: both;
+            padding: 10px 15px;
+            margin: 5px 0;
+            border-radius: 15px;
+            max-width: 70%;
+            word-wrap: break-word;
+            position: relative;
+        }
+        .message.incoming {
+            background: #fff;
+            float: left;
+            border: 1px solid #ddd;
+        }
+        .message.outgoing {
+            background: #dcf8c6;
+            float: right;
+        }
+        .sender {
+            font-size: 0.75em;
+            text-transform: lowercase;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #555;
+        }
+        .text {
+            font-size: 1em;
+            margin-bottom: 5px;
+        }
+        .time {
+            font-size: 0.65em;
+            color: #888;
+            text-align: right;
+        }
+        .media {
+            margin-top: 5px;
+        }
+        .media a {
+            text-decoration: none;
+            color: #007bff;
+            font-size: 0.9em;
+        }
+        .media a:hover {
+            text-decoration: underline;
+        }
+        ul, li { list-style: none; padding: 0; margin: 0; }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <h2>Chat with {{ chat_name }}</h2>
+        <ul>
+        {% for msg in messages %}
+            <li>
+                <div class="message {% if msg['out'] %}outgoing{% else %}incoming{% endif %}">
+                    <div class="sender">{{ msg['sender'] }}</div>
+                    {% if msg['text'] %}
+                        <div class="text">{{ msg['text'] }}</div>
+                    {% endif %}
+                    {% if msg.media_name %}
+                        <div class="media">
+                            <a href="{{ msg.media_name }}" target="_blank">📎 Відкрити медіа</a>
+                        </div>
+                    {% endif %}
+                    <div class="time">{{ msg['time_str'] }}</div>
+                </div>
+            </li>
+        {% endfor %}
+        </ul>
+    </div>
+</body>
+</html>

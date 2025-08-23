@@ -20,7 +20,7 @@
         ul {
             list-style: none;
             padding: 0;
-            max-width: 500px;
+            max-width: 750px;
             margin: 0 auto;
         }
         li {
@@ -65,6 +65,16 @@
             width: auto;
             min-width: 24px;
         }
+        .chat-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .export-btn {
+            display: inline-flex;
+            align-items: center;
+            text-decoration: none;
+        }
     </style>
 </head>
 <body>
@@ -78,15 +88,24 @@
                         <span style="font-size:12px; color:#666; margin-left:8px;">({{ user.last_updated }})</span>
                     {% endif %}
                 </div>
-                {% if user.unread_count and user.unread_count > 0 %}
-                    {% if user.unread_count > 99 %}
-                        <span class="badge wide">99+</span>
-                    {% elif user.unread_count > 9 %}
-                        <span class="badge wide">{{ user.unread_count }}</span>
-                    {% else %}
-                        <span class="badge">{{ user.unread_count }}</span>
+                <div class="chat-actions">
+                    {% if user.unread_count and user.unread_count > 0 %}
+                        {% if user.unread_count > 99 %}
+                            <span class="badge wide">99+</span>
+                        {% elif user.unread_count > 9 %}
+                            <span class="badge wide">{{ user.unread_count }}</span>
+                        {% else %}
+                            <span class="badge">{{ user.unread_count }}</span>
+                        {% endif %}
                     {% endif %}
-                {% endif %}
+                    <a href="/export_user/{{ user.username }}/" download class="export-btn">
+                        <svg class="w-6 h-6 text-gray-800 dark:text-white" aria-hidden="true"
+                             xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+                          <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                stroke-width="2" d="M4 15v2a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-2m-8 1V4m0 12-4-4m4 4 4-4"/>
+                        </svg>
+                    </a>
+                </div>
             </li>
         {% endfor %}
     </ul>

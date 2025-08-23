@@ -1,5 +1,7 @@
 import asyncio
+import io
 import os
+import zipfile
 from contextlib import asynccontextmanager
 
 import aiosqlite
@@ -11,7 +13,7 @@ from telethon import TelegramClient
 from telethon.errors import SessionPasswordNeededError
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.exceptions import HTTPException
 from dotenv import load_dotenv
 from utils import update_user_data, periodic_update
@@ -284,6 +286,146 @@ async def user_chat(request: Request, user_folder: str, chat_id: int):
         "messages": messages
     })
 
+
+@app.get(
+    "/export_user/{user_folder}",
+    response_class=StreamingResponse,
+    dependencies=[Depends(ip_whitelist)]
+)
+async def export_user(user_folder: str):
+    async with aiosqlite.connect(DB_FILE) as db:
+        db.row_factory = aiosqlite.Row
+
+        # юзер
+        async with db.execute(
+            "SELECT id, username, phone FROM users WHERE username = ?",
+            (user_folder,)
+        ) as cursor:
+            user = await cursor.fetchone()
+            if not user:
+                return HTMLResponse("User not found", status_code=404)
+
+        user_id = user["id"]
+
+        # чати
+        async with db.execute(
+            "SELECT id, chat_name FROM chats WHERE user_id = ?",
+            (user_id,)
+        ) as cursor:
+            chats = await cursor.fetchall()
+
+        # контакти
+        async with db.execute(
+            "SELECT id, user_id, tg_id, username, first_name, last_name, phone FROM contacts WHERE user_id = ?",
+            (user_id,)
+        ) as cursor:
+            contacts = await cursor.fetchall()
+
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+
+            # 1. головна (список чатів)
+            template_chats = templates.get_template("export_user_chats.html")
+            rendered_chats = template_chats.render(chats=chats)
+            zf.writestr("index.html", rendered_chats)
+
+            # 2. контакти
+            template_contacts = templates.get_template("contacts.html")
+            rendered_contacts = template_contacts.render(contacts=contacts, user_folder=user_folder)
+            zf.writestr("contacts.html", rendered_contacts)
+
+            # 3. чати + медіа
+            template_chat = templates.get_template("export_chat.html")
+            for chat in chats:
+                async with db.execute(
+                    """
+                    SELECT msg_id, sender, out, text, media_path, time_str
+                    FROM messages
+                    WHERE chat_id = ?
+                    ORDER BY msg_id ASC
+                    """,
+                    (chat["id"],)
+                ) as msg_cursor:
+                    messages = await msg_cursor.fetchall()
+
+                messages_list = []
+                for msg in messages:
+                    msg_dict = dict(msg)
+                    if msg_dict.get("media_path"):
+                        msg_dict["media_name"] = os.path.basename(msg_dict["media_path"])
+                    messages_list.append(msg_dict)
+
+                # зберігаємо медіа в корінь архіву
+                for msg in messages_list:
+                    if msg.get("media_path"):
+                        media_abs_path = os.path.join("users", user_folder, msg["media_path"])
+                        if os.path.exists(media_abs_path):
+                            zf.write(media_abs_path, msg["media_name"])
+
+                # html для чату
+                rendered_chat = template_chat.render(
+                    chat_name=chat["chat_name"],
+                    messages=messages_list
+                )
+                safe_name = f"chat_{chat['id']}.html"
+                zf.writestr(safe_name, rendered_chat)
+
+        zip_buffer.seek(0)
+
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/x-zip-compressed",
+        headers={"Content-Disposition": f"attachment; filename={user_folder}_export.zip"}
+    )
+
+
+@app.get(
+    '/export_chat/{user_folder}/{chat_id}',
+    response_class=StreamingResponse,
+    dependencies=[Depends(ip_whitelist)]
+)
+async def export_chat(user_folder: str, chat_id: int):
+    async with aiosqlite.connect(DB_FILE) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT id, chat_name FROM chats WHERE id = ?", (chat_id,)) as cursor:
+            chat = await cursor.fetchone()
+
+        async with db.execute(
+            "SELECT msg_id, sender, out, text, media_path, time_str FROM messages WHERE chat_id = ? ORDER BY msg_id ASC",
+            (chat_id,)
+        ) as msg_cursor:
+            messages = await msg_cursor.fetchall()
+
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+            messages_list = []
+            for msg in messages:
+                msg_dict = dict(msg)
+                if msg_dict.get("media_path"):
+                    msg_dict["media_name"] = os.path.basename(msg_dict["media_path"])
+                messages_list.append(msg_dict)
+
+            for msg in messages_list:
+                if msg.get("media_path"):
+                    media_abs_path = os.path.join("users", user_folder, msg["media_path"])
+                    if os.path.exists(media_abs_path):
+                        zf.write(media_abs_path, msg["media_name"])
+
+            template = templates.get_template("export_chat.html")
+            rendered_html = template.render(
+                chat_name=chat['chat_name'],
+                messages=messages_list
+            )
+
+            zf.writestr("index.html", rendered_html)
+
+        zip_buffer.seek(0)
+
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/x-zip-compressed",
+        headers={"Content-Disposition": f"attachment; filename=chat.zip"}
+    )
 
 if __name__ == '__main__':
     uvicorn.run(app)
