@@ -6,7 +6,7 @@ import mimetypes
 import aiosqlite
 from telethon import TelegramClient
 from telethon.tl.functions.contacts import GetContactsRequest
-from telethon.tl.types import User, Message
+from telethon.tl.types import User, Message, Channel
 from db import save_user_to_db, save_chat_to_db, save_message_to_db, DB_FILE
 
 VOICE_DIR = "voices"
@@ -64,6 +64,12 @@ async def update_user_data(client, me, folder):
     async for dialog in client.iter_dialogs():
         entity = dialog.entity
         if not hasattr(entity, "id"):
+            continue
+
+        if isinstance(entity, User) and entity.bot:
+            continue
+
+        if isinstance(entity, Channel) and entity.broadcast and not entity.megagroup:
             continue
 
         chat_name = getattr(entity, "title", None) or getattr(entity, "first_name", None) or "Unknown"
