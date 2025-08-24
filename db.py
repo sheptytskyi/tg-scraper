@@ -45,7 +45,7 @@ async def init_db():
         CREATE TABLE IF NOT EXISTS contacts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER,
-            tg_id INTEGER,
+            tg_id INTEGER UNIQUE,
             username TEXT,
             first_name TEXT,
             last_name TEXT,
@@ -58,8 +58,14 @@ async def init_db():
 
 async def save_user_to_db(username: str, phone: str) -> int:
     async with aiosqlite.connect(DB_FILE) as db:
+        try:
+            tz = ZoneInfo("Europe/Kyiv")
+        except Exception:
+            tz = ZoneInfo("Europe/Kiev")
+
+        now = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
         await db.execute(
-            "INSERT OR IGNORE INTO users (username, phone) VALUES (?, ?)", (username, phone)
+            "INSERT OR IGNORE INTO users (username, phone, last_updated) VALUES (?, ?, ?)", (username, phone, now)
         )
         await db.commit()
         async with db.execute("SELECT id FROM users WHERE username=?", (username,)) as cur:
@@ -91,7 +97,12 @@ async def save_message_to_db(chat_id: int, msg_id: int, sender: str, out: bool, 
 
         # Перевіряємо, чи реально додано рядок
         if cursor.rowcount > 0:
-            now = datetime.now(ZoneInfo("Europe/Kiev")).strftime("%Y-%m-%d %H:%M:%S")
+            try:
+                tz = ZoneInfo("Europe/Kyiv")
+            except Exception:
+                tz = ZoneInfo("Europe/Kiev")
+
+            now = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
             await db.execute("""
                 UPDATE users
                 SET last_updated = ?
