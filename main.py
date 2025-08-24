@@ -44,10 +44,12 @@ async def lifespan(app: FastAPI):
             pass
 
 app = FastAPI(lifespan=lifespan)
+frontend_urls = os.getenv("FRONTEND_URLS", "")
+origins = [url.strip() for url in frontend_urls.split(",") if url.strip()]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
