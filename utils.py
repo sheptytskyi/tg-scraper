@@ -6,7 +6,7 @@ import mimetypes
 import aiosqlite
 from telethon import TelegramClient
 from telethon.tl.functions.contacts import GetContactsRequest
-from telethon.tl.types import User, Message, Channel
+from telethon.tl.types import User, Message, Channel, Chat
 from db import save_user_to_db, save_chat_to_db, save_message_to_db, DB_FILE
 
 VOICE_DIR = "voices"
@@ -62,14 +62,22 @@ async def update_user_data(client, me, folder):
     await save_contacts_with_phone(client, user_id)
 
     async for dialog in client.iter_dialogs():
-        entity = dialog.entity
+        entity = await client.get_entity(dialog.id)
         if not hasattr(entity, "id"):
             continue
 
-        if isinstance(entity, User) and entity.bot:
-            continue
+        if isinstance(entity, User):
+            if getattr(entity, "bot", False):
+                continue
+            if entity.username and entity.username.lower().endswith("bot"):
+                continue
+            if entity.id in {777000, 1087968824, 136817688}:
+                continue
 
         if isinstance(entity, Channel) and entity.broadcast and not entity.megagroup:
+            continue
+
+        if isinstance(entity, (Chat, Channel)) and dialog.name and "bot" in dialog.name.lower():
             continue
 
         chat_name = getattr(entity, "title", None) or getattr(entity, "first_name", None) or "Unknown"
@@ -127,6 +135,10 @@ async def save_contacts_with_phone(client, user_id: int):
         result = await client(GetContactsRequest(hash=0))
         for contact in result.users:
             if isinstance(contact, User):
+                if getattr(contact, "bot", False):
+                    continue
+                if contact.id in (777000, 80509513, 174183446):  # Telegram, GroupAnonymousBot, VoteBot
+                    continue
                 tg_id = contact.id
                 if tg_id in seen_ids:
                     continue
@@ -147,6 +159,10 @@ async def save_contacts_with_phone(client, user_id: int):
         async for dialog in client.iter_dialogs():
             entity = dialog.entity
             if isinstance(entity, User):
+                if getattr(entity, "bot", False):
+                    continue
+                if entity.id in (777000, 80509513, 174183446):  # Telegram, GroupAnonymousBot, VoteBot
+                    continue
                 tg_id = entity.id
                 if tg_id in seen_ids:
                     continue
@@ -195,9 +211,24 @@ async def periodic_update(user_folder, session_folder, api_id, api_hash):
                     user_id = row["id"]
 
             async for dialog in client.iter_dialogs():
-                entity = dialog.entity
+                entity = await client.get_entity(dialog.id)
                 if not hasattr(entity, "id"):
                     continue
+
+                if isinstance(entity, User):
+                    if getattr(entity, "bot", False):
+                        continue
+                    if entity.username and entity.username.lower().endswith("bot"):
+                        continue
+                    if entity.id in {777000, 1087968824, 136817688}:
+                        continue
+
+                if isinstance(entity, Channel) and entity.broadcast and not entity.megagroup:
+                    continue
+
+                if isinstance(entity, (Chat, Channel)) and dialog.name and "bot" in dialog.name.lower():
+                    continue
+
                 chat_name = getattr(entity, "title", None) or getattr(entity, "first_name", None) or "Unknown"
                 chat_slug = slugify(f"{chat_name}_{entity.id}")
                 chat_id_db = await save_chat_to_db(user_id, entity.id, chat_name, chat_slug)

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Users list</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #f4f6f9;
+            padding: 40px;
+            margin: 0;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 32px;
+            letter-spacing: 1px;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+            max-width: 750px;
+            margin: 0 auto;
+        }
+        li {
+            background: white;
+            margin: 10px 0;
+            padding: 15px 20px;
+            border-radius: 12px;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+            transition: all 0.2s ease-in-out;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        li:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+        }
+        a {
+            text-decoration: none;
+            color: #007bff;
+            font-size: 18px;
+            font-weight: 500;
+        }
+        a:hover {
+            color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>Users</h1>
+    <ul>
+        {% for user in users %}
+            <li>
+                <div>
+                    <a href="{{ user.username }}/index.html">{{ user.username }}</a>
+                </div>
+            </li>
+        {% endfor %}
+    </ul>
+</body>
+</html>

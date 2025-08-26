@@ -429,5 +429,101 @@ async def export_chat(user_folder: str, chat_id: int):
         headers={"Content-Disposition": f"attachment; filename=chat.zip"}
     )
 
+
+@app.get(
+    "/export_all_users",
+    response_class=StreamingResponse,
+    dependencies=[Depends(ip_whitelist)]
+)
+async def export_all_users():
+    async with aiosqlite.connect(DB_FILE) as db:
+        db.row_factory = aiosqlite.Row
+
+        # всі юзери
+        async with db.execute("SELECT id, username FROM users ORDER BY id ASC") as cursor:
+            users = await cursor.fetchall()
+
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+
+            # --- головний index.html (список юзерів) ---
+            template_users = templates.get_template("export_users_list.html")
+            rendered_users = template_users.render(users=users)
+            zf.writestr("index.html", rendered_users)
+
+            # --- цикл по юзерах ---
+            for user in users:
+                user_id = user["id"]
+                username = user["username"]
+
+                # чати юзера
+                async with db.execute(
+                    "SELECT id, chat_name FROM chats WHERE user_id = ?",
+                    (user_id,)
+                ) as cursor_chats:
+                    chats = await cursor_chats.fetchall()
+
+                # контакти юзера
+                async with db.execute(
+                    "SELECT id, user_id, tg_id, username, first_name, last_name, phone FROM contacts WHERE user_id = ?",
+                    (user_id,)
+                ) as cursor:
+                    contacts = await cursor.fetchall()
+
+                # --- index.html (список чатів юзера) ---
+                template_chats = templates.get_template("export_user_chats.html")
+                rendered_chats = template_chats.render(user=user, chats=chats)
+                zf.writestr(f"{username}/index.html", rendered_chats)
+
+                # --- contacts.html ---
+                template_contacts = templates.get_template("contacts.html")
+                rendered_contacts = template_contacts.render(user_folder=username, contacts=contacts)
+                zf.writestr(f"{username}/contacts.html", rendered_contacts)
+
+                # --- кожен чат окремо ---
+                template_chat = templates.get_template("export_chat.html")
+                for chat in chats:
+                    async with db.execute(
+                        """
+                        SELECT msg_id, sender, out, text, media_path, time_str
+                        FROM messages
+                        WHERE chat_id = ?
+                        ORDER BY msg_id ASC
+                        """,
+                        (chat["id"],)
+                    ) as msg_cursor:
+                        messages = await msg_cursor.fetchall()
+
+                    messages_list = []
+                    for msg in messages:
+                        msg_dict = dict(msg)
+                        if msg_dict.get("media_path"):
+                            msg_dict["media_name"] = os.path.basename(msg_dict["media_path"])
+                        messages_list.append(msg_dict)
+
+                    # медіа у папці юзера
+                    for msg in messages_list:
+                        if msg.get("media_path"):
+                            media_abs_path = os.path.join("users", username, msg["media_path"])
+                            if os.path.exists(media_abs_path):
+                                zf.write(media_abs_path, f"{username}/{msg['media_name']}")
+
+                    # html для чату
+                    rendered_chat = template_chat.render(
+                        chat_name=chat["chat_name"],
+                        messages=messages_list
+                    )
+                    safe_name = f"{username}/chat_{chat['id']}.html"
+                    zf.writestr(safe_name, rendered_chat)
+
+        zip_buffer.seek(0)
+
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/x-zip-compressed",
+        headers={"Content-Disposition": "attachment; filename=all_users_export.zip"}
+    )
+
+
 if __name__ == '__main__':
     uvicorn.run(app)
