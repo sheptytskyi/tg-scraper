@@ -61,12 +61,20 @@
         .media a:hover {
             text-decoration: underline;
         }
+        .group {
+            color: #555555;
+            font-size: 50%;
+        }
         ul, li { list-style: none; padding: 0; margin: 0; }
     </style>
 </head>
 <body>
     <div class="chat-container">
-        <h2>Chat with {{ chat_name }}</h2>
+        {% if chat_type == 'group' %}
+            <h2>Chat with {{ chat_name }} <span class="group">[GROUP]</span></h2>
+        {% else %}
+            <h2>Chat with {{ chat_name }}</h2>
+        {% endif %}
         <ul>
         {% for msg in messages %}
             <li>

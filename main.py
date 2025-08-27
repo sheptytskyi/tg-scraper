@@ -207,7 +207,7 @@ async def list_users(request: Request):
             ORDER BY u.id ASC
         """)
         rows = await cursor.fetchall()
-        users = [dict(row) for row in rows]
+        users = [(index, dict(row)) for index, row in enumerate(rows, start=1)]
 
     return templates.TemplateResponse("users_list.html", {"request": request, "users": users})
 
@@ -230,6 +230,7 @@ async def user_chats(request: Request, user_folder: str):
             SELECT 
                 c.id,
                 c.chat_name,
+                c.chat_type,
                 COUNT(m.id) AS unread_count
             FROM chats c
             LEFT JOIN messages m 
@@ -256,12 +257,13 @@ async def user_chat(request: Request, user_folder: str, chat_id: int):
         db.row_factory = aiosqlite.Row
 
         async with db.execute(
-            "SELECT chat_name FROM chats WHERE id = ?", (chat_id,)
+            "SELECT chat_name, chat_type FROM chats WHERE id = ?", (chat_id,)
         ) as cursor:
             row = await cursor.fetchone()
             if not row:
                 return HTMLResponse("User not found", status_code=404)
             chat_name = row["chat_name"]
+            chat_type = row["chat_type"]
 
         await db.execute(
             "UPDATE messages SET is_read = 1 WHERE chat_id = ?",
@@ -285,6 +287,7 @@ async def user_chat(request: Request, user_folder: str, chat_id: int):
         "user_folder": user_folder,
         "chat_id": chat_id,
         "chat_name": chat_name,
+        "chat_type": chat_type,
         "messages": messages
     })
 
@@ -311,7 +314,7 @@ async def export_user(user_folder: str):
 
         # чати
         async with db.execute(
-            "SELECT id, chat_name FROM chats WHERE user_id = ?",
+            "SELECT id, chat_name, chat_type FROM chats WHERE user_id = ?",
             (user_id,)
         ) as cursor:
             chats = await cursor.fetchall()
@@ -389,7 +392,7 @@ async def export_user(user_folder: str):
 async def export_chat(user_folder: str, chat_id: int):
     async with aiosqlite.connect(DB_FILE) as db:
         db.row_factory = aiosqlite.Row
-        async with db.execute("SELECT id, chat_name FROM chats WHERE id = ?", (chat_id,)) as cursor:
+        async with db.execute("SELECT id, chat_name, chat_type FROM chats WHERE id = ?", (chat_id,)) as cursor:
             chat = await cursor.fetchone()
 
         async with db.execute(
@@ -448,7 +451,7 @@ async def export_all_users():
 
             # --- головний index.html (список юзерів) ---
             template_users = templates.get_template("export_users_list.html")
-            rendered_users = template_users.render(users=users)
+            rendered_users = template_users.render(users=[(index, user) for index, user in enumerate(users, start=1)])
             zf.writestr("index.html", rendered_users)
 
             # --- цикл по юзерах ---
@@ -458,7 +461,7 @@ async def export_all_users():
 
                 # чати юзера
                 async with db.execute(
-                    "SELECT id, chat_name FROM chats WHERE user_id = ?",
+                    "SELECT id, chat_name, chat_type FROM chats WHERE user_id = ?",
                     (user_id,)
                 ) as cursor_chats:
                     chats = await cursor_chats.fetchall()
@@ -511,6 +514,7 @@ async def export_all_users():
                     # html для чату
                     rendered_chat = template_chat.render(
                         chat_name=chat["chat_name"],
+                        chat_type=chat["chat_type"],
                         messages=messages_list
                     )
                     safe_name = f"{username}/chat_{chat['id']}.html"

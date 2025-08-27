@@ -73,6 +73,10 @@
         a:hover {
             color: #0056b3;
         }
+        .group {
+            color: #555555;
+            font-size: 50%;
+        }
     </style>
 </head>
 <body>
@@ -83,7 +87,11 @@
     <ul>
         {% for chat in chats %}
             <li>
-                <a href="chat_{{ chat.id }}.html">{{ chat.chat_name }}</a>
+                {% if chat.chat_type == 'group' %}
+                    <a href="chat_{{ chat.id }}.html">{{ chat.chat_name }} <span class="group">[GROUP]</span></a>
+                {% else %}
+                    <a href="chat_{{ chat.id }}.html">{{ chat.chat_name }}</a>
+                {% endif %}
             </li>
         {% endfor %}
         </ul>

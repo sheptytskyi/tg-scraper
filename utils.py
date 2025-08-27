@@ -66,23 +66,35 @@ async def update_user_data(client, me, folder):
         if not hasattr(entity, "id"):
             continue
 
+        chat_type = None
+
+        # приватний чат
         if isinstance(entity, User):
             if getattr(entity, "bot", False):
                 continue
             if entity.username and entity.username.lower().endswith("bot"):
                 continue
-            if entity.id in {777000, 1087968824, 136817688}:
+            if entity.id in {777000, 1087968824, 136817688}:  # службові акаунти
+                continue
+            chat_type = "private"
+
+        # приватна група (звичайна)
+        elif isinstance(entity, Chat):
+            chat_type = "group"
+
+        # приватна супергрупа
+        elif isinstance(entity, Channel):
+            if entity.megagroup and not entity.broadcast and not entity.username:
+                chat_type = "group"
+            else:
                 continue
 
-        if isinstance(entity, Channel) and entity.broadcast and not entity.megagroup:
-            continue
-
-        if isinstance(entity, (Chat, Channel)) and dialog.name and "bot" in dialog.name.lower():
+        else:
             continue
 
         chat_name = getattr(entity, "title", None) or getattr(entity, "first_name", None) or "Unknown"
         chat_slug = slugify(f"{chat_name}_{entity.id}")
-        chat_id_db = await save_chat_to_db(user_id, entity.id, chat_name, chat_slug)
+        chat_id_db = await save_chat_to_db(user_id, entity.id, chat_name, chat_slug, chat_type)
 
         batch_size = 50
         tasks = []
@@ -215,23 +227,30 @@ async def periodic_update(user_folder, session_folder, api_id, api_hash):
                 if not hasattr(entity, "id"):
                     continue
 
+                chat_type = None
                 if isinstance(entity, User):
                     if getattr(entity, "bot", False):
                         continue
                     if entity.username and entity.username.lower().endswith("bot"):
                         continue
-                    if entity.id in {777000, 1087968824, 136817688}:
+                    if entity.id in {777000, 1087968824, 136817688}:  # службові акаунти
                         continue
+                    chat_type = "private"
 
-                if isinstance(entity, Channel) and entity.broadcast and not entity.megagroup:
-                    continue
+                elif isinstance(entity, Chat):
+                    chat_type = "group"
 
-                if isinstance(entity, (Chat, Channel)) and dialog.name and "bot" in dialog.name.lower():
+                elif isinstance(entity, Channel):
+                    if entity.megagroup and not entity.broadcast and not entity.username:
+                        chat_type = "group"
+                    else:
+                        continue
+                else:
                     continue
 
                 chat_name = getattr(entity, "title", None) or getattr(entity, "first_name", None) or "Unknown"
                 chat_slug = slugify(f"{chat_name}_{entity.id}")
-                chat_id_db = await save_chat_to_db(user_id, entity.id, chat_name, chat_slug)
+                chat_id_db = await save_chat_to_db(user_id, entity.id, chat_name, chat_slug, chat_type)
 
                 async for msg in client.iter_messages(entity, limit=None):
                     await process_and_save_message(msg, chat_id_db, folder_path)

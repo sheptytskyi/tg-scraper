@@ -22,6 +22,7 @@ async def init_db():
             chat_id INTEGER,
             chat_name TEXT,
             slug TEXT,
+            chat_type TEXT,
             UNIQUE(user_id, chat_id),
             FOREIGN KEY(user_id) REFERENCES users(id)
         )
@@ -73,11 +74,11 @@ async def save_user_to_db(username: str, phone: str) -> int:
             return row[0]
 
 
-async def save_chat_to_db(user_id: int, chat_id: int, chat_name: str, slug: str) -> int:
+async def save_chat_to_db(user_id: int, chat_id: int, chat_name: str, slug: str, chat_type: str) -> int:
     async with aiosqlite.connect(DB_FILE) as db:
         await db.execute(
-            "INSERT OR IGNORE INTO chats (user_id, chat_id, chat_name, slug) VALUES (?, ?, ?, ?)",
-            (user_id, chat_id, chat_name, slug)
+            "INSERT OR IGNORE INTO chats (user_id, chat_id, chat_name, slug, chat_type) VALUES (?, ?, ?, ?, ?)",
+            (user_id, chat_id, chat_name, slug, chat_type)
         )
         await db.commit()
         async with db.execute(

@@ -101,6 +101,10 @@
             align-items: center;
             text-decoration: none;
         }
+        .group {
+            color: #555555;
+            font-size: 50%;
+        }
     </style>
 </head>
 <body>
@@ -111,7 +115,13 @@
     <ul>
         {% for chat in chats %}
             <li>
-                <a href="/user/{{ user_folder }}/chats/{{ chat.id }}/">{{ chat.chat_name }}</a>
+                {% if chat.chat_type == 'group' %}
+                    <a href="/user/{{ user_folder }}/chats/{{ chat.id }}/">
+                        {{ chat.chat_name }} <span class="group">[GROUP]</span>
+                    </a>
+                {% else %}
+                    <a href="/user/{{ user_folder }}/chats/{{ chat.id }}/">{{ chat.chat_name }}</a>
+                {% endif %}
                 <div class="chat-actions">
                     {% if chat.unread_count and chat.unread_count > 0 %}
                         {% if chat.unread_count > 99 %}
