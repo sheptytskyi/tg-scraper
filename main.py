@@ -370,6 +370,7 @@ async def export_user(user_folder: str):
                 # html для чату
                 rendered_chat = template_chat.render(
                     chat_name=chat["chat_name"],
+                    chat_type=chat["chat_type"],
                     messages=messages_list
                 )
                 safe_name = f"chat_{chat['id']}.html"
