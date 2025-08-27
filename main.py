@@ -419,6 +419,7 @@ async def export_chat(user_folder: str, chat_id: int):
             template = templates.get_template("export_chat.html")
             rendered_html = template.render(
                 chat_name=chat['chat_name'],
+                chat_type=chat['chat_type'],
                 messages=messages_list
             )
 
