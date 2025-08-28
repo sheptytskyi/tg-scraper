@@ -206,7 +206,7 @@ async def periodic_update(user_folder, session_folder, api_id, api_hash):
             if not os.path.exists(session_file):
                 continue
 
-            client = TelegramClient(session_file, api_id, api_hash)
+            client = TelegramClient(session_file, api_id, api_hash, connection_retries=15, timeout=20)
             await client.connect()
             if not await client.is_user_authorized():
                 await client.disconnect()

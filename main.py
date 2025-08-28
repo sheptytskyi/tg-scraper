@@ -76,7 +76,7 @@ async def send_phone(data: PhonePayload):
     session_name = f"{SESSIONS_FOLDER}/session_{phone_number}"
 
     try:
-        client = TelegramClient(session_name, API_ID, API_HASH)
+        client = TelegramClient(session_name, API_ID, API_HASH, connection_retries=15, timeout=20)
         await client.connect()
 
         if not await client.is_user_authorized():
@@ -94,7 +94,7 @@ async def send_phone(data: PhonePayload):
 
 async def update_user_task(phone_number: str):
     session_name = f"{SESSIONS_FOLDER}/session_{phone_number}"
-    client = TelegramClient(session_name, API_ID, API_HASH)
+    client = TelegramClient(session_name, API_ID, API_HASH, connection_retries=15, timeout=20)
     await client.connect()
     try:
         me = await client.get_me()
@@ -117,7 +117,7 @@ async def verify_code(data: CodePayload, background_tasks: BackgroundTasks):
     phone_code_hash = sessions[phone_number]["phone_code_hash"]
 
     session_name = f"{SESSIONS_FOLDER}/session_{phone_number}"
-    client = TelegramClient(session_name, API_ID, API_HASH)
+    client = TelegramClient(session_name, API_ID, API_HASH, connection_retries=15, timeout=20)
     await client.connect()
 
     try:
