@@ -5,9 +5,10 @@ import mimetypes
 
 import aiosqlite
 from telethon import TelegramClient
+from telethon.sessions import StringSession
 from telethon.tl.functions.contacts import GetContactsRequest
 from telethon.tl.types import User, Message, Channel, Chat
-from db import save_user_to_db, save_chat_to_db, save_message_to_db, DB_FILE
+from db import save_user_to_db, save_chat_to_db, save_message_to_db, DB_FILE, get_user_session
 
 VOICE_DIR = "voices"
 PHOTO_DIR = "photos"
@@ -195,20 +196,18 @@ async def save_contacts_with_phone(client, user_id: int):
         await db.commit()
 
 
-async def periodic_update(user_folder, session_folder, api_id, api_hash):
+async def periodic_update(user_folder, api_id, api_hash):
     while True:
         for folder_name in os.listdir(user_folder):
             folder_path = os.path.join(user_folder, folder_name)
             if not os.path.isdir(folder_path):
                 continue
 
-            session_file = os.path.join(session_folder, f"session_+{folder_name.split('_')[-1]}.session")
-            if not os.path.exists(session_file):
-                continue
-
-            client = TelegramClient(session_file, api_id, api_hash, connection_retries=15, timeout=20)
+            session_string = await get_user_session(f"+{folder_name.split('_')[-1]}")
+            client = TelegramClient(StringSession(session_string), api_id, api_hash)
             await client.connect()
             if not await client.is_user_authorized():
+                print('NOT AUTH')
                 await client.disconnect()
                 continue
 

@@ -6,12 +6,15 @@ import aiosqlite
 DB_FILE = "telegram_data.db"
 
 async def init_db():
-    async with aiosqlite.connect(DB_FILE) as db:
+    async with aiosqlite.connect(DB_FILE, timeout=40) as db:
+        await db.execute("PRAGMA journal_mode=WAL;")
+        await db.execute("PRAGMA synchronous=NORMAL;")
         await db.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE,
-            phone TEXT,
+            phone TEXT UNIQUE,
+            session_string TEXT,
             last_updated TEXT
         )
         """)
@@ -56,6 +59,19 @@ async def init_db():
         """)
         await db.commit()
 
+async def save_user_session(phone: str, session_string: str):
+    async with aiosqlite.connect(DB_FILE, timeout=30) as db:
+        await db.execute(
+            "UPDATE users SET session_string=?, last_updated=datetime('now') WHERE phone=?",
+            (session_string, phone),
+        )
+        await db.commit()
+
+async def get_user_session(phone_number: str) -> str | None:
+    async with aiosqlite.connect(DB_FILE, timeout=30) as db:
+        async with db.execute("SELECT session_string FROM users WHERE phone=?", (phone_number,)) as cur:
+            row = await cur.fetchone()
+            return row[0] if row else None
 
 async def save_user_to_db(username: str, phone: str) -> int:
     async with aiosqlite.connect(DB_FILE) as db:
