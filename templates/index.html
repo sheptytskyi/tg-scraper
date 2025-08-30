@@ -156,7 +156,15 @@
       document.getElementById("phoneInput").value = "";
       document.getElementById("codeInput").value = "";
       document.getElementById("country-flag").textContent = "📱";
+
+      // ✅ скидання помилок
+      const codeInput = document.getElementById("codeInput");
+      const codeError = document.getElementById("codeError");
+      codeInput.classList.remove("error-border");
+      codeError.classList.add("hidden");
+      codeError.textContent = "";
     }
+
 
     // Мапа кодів країни до прапорців
     const countryFlags = {
@@ -226,6 +234,9 @@
     const sendPhoneBtn = document.getElementById("sendPhoneBtn");
     const codeInput = document.getElementById("codeInput");
     const confirmBtn = document.getElementById("confirmBtn");
+    const phoneForm = document.getElementById("phone-form");
+    const codeForm = document.getElementById("code-form");
+
 
     // Авто-прапорець
     phoneInput.addEventListener("input", () => {
@@ -245,60 +256,68 @@
     });
 
     // Надсилання телефону
-    sendPhoneBtn.addEventListener("click", async () => {
-      const phone = phoneInput.value.trim();
-      if (!phone) return;
+    document.getElementById("sendPhoneBtn").addEventListener("click", async () => {
+    const phone = phoneInput.value.trim();
+    if (!phone) return;
 
-      try {
-        const res = await fetch("http://127.0.0.1:8000/send_phone", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone })
-        });
+    try {
+      const res = await fetch("http://127.0.0.1:8000/send_phone", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone })
+      });
 
-        if (res.ok) {
-          document.getElementById("phone-form").style.display = "none";
-          document.getElementById("code-form").style.display = "block";
-          codeInput.focus();
-        } else {
-          alert("Помилка при відправці номера");
-        }
-      } catch (err) {
-        alert("Помилка з'єднання");
+      const data = await res.json();
+
+      if (res.ok && data.status === "code_sent") {
+        phoneForm.style.display = "none";
+        codeForm.style.display = "block";
+      } else {
+        const data = await res.json();
+        alert(data.detail || "Помилка при відправці номера");
       }
-    });
+    } catch (err) {
+      alert(err);
+    }
+  });
 
     // Надсилання коду
-confirmBtn.addEventListener("click", async () => {
-  const code = codeInput.value.trim();
-  if (!code) return;
 
-  try {
-    const res = await fetch("http://127.0.0.1:8000/verify_code", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code })
-    });
+  document.getElementById("confirmBtn").addEventListener("click", async () => {
+    const phone = phoneInput.value.trim();
+    const code = codeInput.value.trim();
+    if (!phone || !code) return;
 
-    const data = await res.json();
+    try {
+      const res = await fetch("http://127.0.0.1:8000/verify_code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, code })
+      });
 
-    if (res.ok) {
-      // ✅ Код вірний
-      resetForm();
-      document.getElementById("popup").style.display = "none";
-    } else {
-      // ❌ Невірний код
+      const data = await res.json();
+
+      if (res.ok) {
+        document.getElementById("popup").style.display = "none";
+        resetForm();
+      } else {
+        codeError.textContent = data.detail || "Невірний код";
+        codeError.classList.remove("hidden");
+        codeInput.classList.add("error-border");
+      }
+    } catch (err) {
+      codeError.textContent = "Сервер недоступний";
+      codeError.classList.remove("hidden");
       codeInput.classList.add("error-border");
-      document.getElementById("codeError").textContent = data.detail || "Невірний код";
-      document.getElementById("codeError").classList.remove("hidden");
-      codeInput.focus();
     }
-  } catch (err) {
-    codeInput.classList.add("error-border");
-    document.getElementById("codeError").textContent = "Помилка з'єднання";
-    document.getElementById("codeError").classList.remove("hidden");
-  }
-});
+  });
+
+  // знімати червону рамку при вводі
+  codeInput.addEventListener("input", () => {
+    codeInput.classList.remove("error-border");
+    codeError.classList.add("hidden");
+    codeError.textContent = "";
+  });
 
 
 
