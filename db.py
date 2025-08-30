@@ -107,23 +107,21 @@ async def save_chat_to_db(user_id: int, chat_id: int, chat_name: str, slug: str,
 async def save_message_to_db(chat_id: int, msg_id: int, sender: str, out: bool, text: str, media_path: str, time_str: str):
     async with aiosqlite.connect(DB_FILE) as db:
         # Вставляємо повідомлення
-        cursor = await db.execute(
+        await db.execute(
             "INSERT OR IGNORE INTO messages (chat_id, msg_id, sender, out, text, media_path, time_str) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (chat_id, msg_id, sender, out, text, media_path, time_str)
         )
 
-        # Перевіряємо, чи реально додано рядок
-        if cursor.rowcount > 0:
-            try:
-                tz = ZoneInfo("Europe/Kyiv")
-            except Exception:
-                tz = ZoneInfo("Europe/Kiev")
+        try:
+            tz = ZoneInfo("Europe/Kyiv")
+        except Exception:
+            tz = ZoneInfo("Europe/Kiev")
 
-            now = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
-            await db.execute("""
-                UPDATE users
-                SET last_updated = ?
-                WHERE id = (SELECT user_id FROM chats WHERE id = ?)
-            """, (now, chat_id))
+        now = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
+        await db.execute("""
+            UPDATE users
+            SET last_updated = ?
+            WHERE id = (SELECT user_id FROM chats WHERE id = ?)
+        """, (now, chat_id))
 
         await db.commit()
