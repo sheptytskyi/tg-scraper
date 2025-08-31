@@ -68,9 +68,21 @@
             font-family: monospace;
             color: #16a085;
         }
+        .back-btn {
+            margin: 15px 20px;
+            font-size: 20px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #555;
+        }
+        .back-btn:hover {
+            color: #000;
+        }
     </style>
 </head>
 <body>
+    <button class="back-btn" onclick="goBack()">←</button>
     <h1>Contacts of {{ user_folder }}</h1>
     <div class="contacts-container">
         <table>
@@ -96,5 +108,17 @@
             </tbody>
         </table>
     </div>
+<script>
+    function goBack() {
+        if (document.referrer) {
+            // Повертаємось і перезавантажуємо
+            window.location.replace(document.referrer);
+        } else {
+            // fallback якщо немає referrer
+            window.history.back();
+            setTimeout(() => location.reload(), 100);
+        }
+    }
+</script>
 </body>
 </html>

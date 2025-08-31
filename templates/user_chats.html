@@ -105,9 +105,22 @@
             color: #555555;
             font-size: 50%;
         }
+        .back-btn {
+            align-self: flex-start; /* розташовує елемент зліва в колонці */
+            margin: 15px 0 0 20px; /* зверху і зліва відступи */
+            font-size: 20px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #555;
+        }
+        .back-btn:hover {
+            color: #000;
+        }
     </style>
 </head>
 <body>
+<button class="back-btn" onclick="window.location.href='/users'">←</button>
     <div class="top-bar">
         <h1>Chats</h1>
         <a class="contacts-btn" href="/user/{{ user_folder }}/contacts">Contacts</a>
@@ -143,5 +156,17 @@
             </li>
         {% endfor %}
         </ul>
+<script>
+    function goBack() {
+        if (document.referrer) {
+            // Повертаємось і перезавантажуємо
+            window.location.replace(document.referrer);
+        } else {
+            // fallback якщо немає referrer
+            window.history.back();
+            setTimeout(() => location.reload(), 100);
+        }
+    }
+</script>
 </body>
 </html>

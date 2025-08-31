@@ -1,6 +1,7 @@
 import asyncio
 import io
 import os
+import shutil
 import zipfile
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -92,7 +93,6 @@ async def send_phone(data: PhonePayload):
         await client.disconnect()
         return {"status": "code_sent"}
     except Exception as e:
-        print(e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -564,6 +564,45 @@ async def export_all_users():
         media_type="application/x-zip-compressed",
         headers={"Content-Disposition": "attachment; filename=all_users_export.zip"}
     )
+
+
+@app.delete("/user/{username}/")
+async def delete_user(username: str, dependencies=[Depends(ip_whitelist)]):
+    async with aiosqlite.connect(DB_FILE, timeout=40) as db:
+        db.row_factory = aiosqlite.Row
+        await db.execute("PRAGMA foreign_keys = ON;")
+
+        # Отримуємо юзера
+        async with db.execute("SELECT id FROM users WHERE username = ?", (username,))  as cursor:
+            user = await cursor.fetchone()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        user_id = user['id']
+
+        # Видаляємо повідомлення користувача
+        await db.execute("""
+            DELETE FROM messages
+            WHERE chat_id IN (SELECT id FROM chats WHERE user_id = ?)
+        """, (user_id,))
+
+        # Видаляємо чати користувача
+        await db.execute("DELETE FROM chats WHERE user_id = ?", (user_id,))
+
+        # Видаляємо контакти користувача
+        await db.execute("DELETE FROM contacts WHERE user_id = ?", (user_id,))
+
+        # Видаляємо самого юзера
+        await db.execute("DELETE FROM users WHERE id = ?", (user_id,))
+
+        await db.commit()
+
+    # Видаляємо папку користувача
+    user_folder = os.path.join(USERS_FOLDER, username)
+    if os.path.exists(user_folder) and os.path.isdir(user_folder):
+        shutil.rmtree(user_folder)
+
+    return {"status": "deleted"}
 
 
 if __name__ == '__main__':

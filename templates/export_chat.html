@@ -10,6 +10,17 @@
             margin: 0;
             padding: 0;
         }
+        .back-btn {
+            margin: 15px 20px;
+            font-size: 20px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #555;
+        }
+        .back-btn:hover {
+            color: #000;
+        }
         .chat-container {
             max-width: 800px;
             margin: 0 auto;
@@ -57,15 +68,55 @@
             text-decoration: none;
             color: #007bff;
             font-size: 0.9em;
+            cursor: pointer;
         }
         .media a:hover {
             text-decoration: underline;
+        }
+        .media img {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 8px;
+            cursor: pointer;
         }
         .group {
             color: #555555;
             font-size: 50%;
         }
         ul, li { list-style: none; padding: 0; margin: 0; }
+
+        /* Popup */
+        .popup {
+            display: none;
+            position: fixed;
+            z-index: 999;
+            left: 0; top: 0;
+            width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.8);
+            justify-content: center;
+            align-items: center;
+        }
+        .popup-content {
+            position: relative;
+            max-width: 90%;
+            max-height: 90%;
+        }
+        .popup-content img {
+            max-width: 100%;
+            max-height: 100%;
+            border-radius: 8px;
+        }
+        .popup-close {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            background: #fff;
+            border-radius: 50%;
+            border: 1px solid #ccc;
+            font-size: 18px;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -84,8 +135,14 @@
                         <div class="text">{{ msg['text'] }}</div>
                     {% endif %}
                     {% if msg.media_name %}
+                        {% set file_url = msg.media_name %}
+                        {% set ext = msg.media_name.split('.')[-1]|lower %}
                         <div class="media">
-                            <a href="{{ msg.media_name }}" target="_blank">📎 Відкрити медіа</a>
+                            {% if ext in ['jpg','jpeg','png','gif','webp'] %}
+                                <img src="{{ file_url }}" onclick="openPopup('{{ file_url }}')">
+                            {% else %}
+                                <a href="{{ file_url }}" target="_blank">📎 Відкрити медіа</a>
+                            {% endif %}
                         </div>
                     {% endif %}
                     <div class="time">{{ msg['time_str'] }}</div>
@@ -94,5 +151,22 @@
         {% endfor %}
         </ul>
     </div>
+    <div id="popup" class="popup" onclick="closePopup()">
+        <div class="popup-content" onclick="event.stopPropagation()">
+            <span class="popup-close" onclick="closePopup()">✖</span>
+            <img id="popup-img" src="" alt="media">
+        </div>
+    </div>
+
+    <script>
+        function openPopup(src) {
+            document.getElementById("popup-img").src = src;
+            document.getElementById("popup").style.display = "flex";
+        }
+        function closePopup() {
+            document.getElementById("popup").style.display = "none";
+            document.getElementById("popup-img").src = "";
+        }
+    </script>
 </body>
 </html>
