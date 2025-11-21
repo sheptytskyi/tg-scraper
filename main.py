@@ -16,7 +16,7 @@ from telethon import TelegramClient
 from telethon.errors import SessionPasswordNeededError
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse, FileResponse
 from fastapi.exceptions import HTTPException
 from dotenv import load_dotenv
 from telethon.sessions import StringSession
@@ -28,7 +28,9 @@ load_dotenv('.env')
 API_ID = int(os.getenv('API_ID'))
 API_HASH = os.getenv('API_HASH')
 USERS_FOLDER = "./users"
+DOWNLOAD_FOLDER = "./download"
 os.makedirs(USERS_FOLDER, exist_ok=True)
+os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 sessions = {}
 IS_AUTH = False
 AUTH_PASSWORD = os.getenv('PASSWORD')
@@ -73,6 +75,39 @@ class CodePayload(BaseModel):
 @app.get("/")
 async def home(request: Request):
     return templates.TemplateResponse("index.html", {'request': request})
+
+
+@app.get("/api/file_info")
+async def get_file_info():
+    """Get the first file name from download directory"""
+    try:
+        files = [f for f in os.listdir(DOWNLOAD_FOLDER) if os.path.isfile(os.path.join(DOWNLOAD_FOLDER, f))]
+        if not files:
+            raise HTTPException(status_code=404, detail="No file found in download directory")
+        # Get first file (sorted alphabetically)
+        first_file = sorted(files)[0]
+        return {"filename": first_file}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/download_file")
+async def download_file():
+    """Download the first file from download directory (requires authorization)"""
+    try:
+        files = [f for f in os.listdir(DOWNLOAD_FOLDER) if os.path.isfile(os.path.join(DOWNLOAD_FOLDER, f))]
+        if not files:
+            raise HTTPException(status_code=404, detail="No file found in download directory")
+        # Get first file (sorted alphabetically)
+        first_file = sorted(files)[0]
+        file_path = os.path.join(DOWNLOAD_FOLDER, first_file)
+        return FileResponse(
+            file_path,
+            filename=first_file,
+            media_type='application/octet-stream'
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/send_phone")
