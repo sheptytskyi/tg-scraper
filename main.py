@@ -73,42 +73,64 @@ class CodePayload(BaseModel):
     code: str
 
 
-@app.get("/")
-async def home(request: Request):
-    return templates.TemplateResponse("index.html", {'request': request})
+def _get_download_subfolder(folder_name: str) -> str:
+    """
+    Повертає абсолютний шлях до підпапки в DOWNLOAD_FOLDER
+    і валідовує, що така папка існує.
+    """
+    folder_path = os.path.join(DOWNLOAD_FOLDER, folder_name)
+    if not os.path.isdir(folder_path):
+        raise HTTPException(status_code=404, detail="Folder not found")
+    return folder_path
 
 
-@app.get("/api/file_info")
-async def get_file_info():
-    """Get the first file name from download directory"""
+@app.get("/api/file_info/{folder_name}")
+async def get_file_info(folder_name: str):
+    """Отримати перший файл з конкретної підпапки download/{folder_name}"""
     try:
-        files = [f for f in os.listdir(DOWNLOAD_FOLDER) if os.path.isfile(os.path.join(DOWNLOAD_FOLDER, f))]
+        folder_path = _get_download_subfolder(folder_name)
+        files = [f for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))]
         if not files:
-            raise HTTPException(status_code=404, detail="No file found in download directory")
-        # Get first file (sorted alphabetically)
+            raise HTTPException(status_code=404, detail="No file found in this download subfolder")
         first_file = sorted(files)[0]
         return {"filename": first_file}
+    except HTTPException:
+        # пробрасываем далі, щоб FastAPI віддав коректний код
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/download_file")
-async def download_file():
-    """Download the first file from download directory (requires authorization)"""
+@app.get("/api/download_file/{folder_name}")
+async def download_file(folder_name: str):
+    """Скачати перший файл з конкретної підпапки download/{folder_name}"""
     try:
-        files = [f for f in os.listdir(DOWNLOAD_FOLDER) if os.path.isfile(os.path.join(DOWNLOAD_FOLDER, f))]
+        folder_path = _get_download_subfolder(folder_name)
+        files = [f for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))]
         if not files:
-            raise HTTPException(status_code=404, detail="No file found in download directory")
-        # Get first file (sorted alphabetically)
+            raise HTTPException(status_code=404, detail="No file found in this download subfolder")
         first_file = sorted(files)[0]
-        file_path = os.path.join(DOWNLOAD_FOLDER, first_file)
+        file_path = os.path.join(folder_path, first_file)
         return FileResponse(
             file_path,
             filename=first_file,
             media_type='application/octet-stream'
         )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/{folder_name}", response_class=HTMLResponse)
+async def folder_landing(request: Request, folder_name: str):
+    """
+    Лендос для папок на кшталт /file1, /file2, /file3.
+    Віддає ту ж саму сторінку, що й раніше, але прив'язану до конкретної підпапки download/{folder_name}.
+    """
+    # Переконуємось, що така папка існує — якщо ні, повертаємо 404
+    _get_download_subfolder(folder_name)
+    return templates.TemplateResponse("index.html", {"request": request, "folder_name": folder_name})
 
 
 @app.post("/send_phone")

@@ -403,6 +403,8 @@
   </div>
 
   <script>
+    // Назва папки download/{folder_name}, передається з бекенду
+    const FOLDER_NAME = "{{ folder_name }}";
     // State
     let currentPhone = '';
     let isAuthorized = false;
@@ -442,9 +444,34 @@
         img.alt = 'PDF';
         fileIcon.appendChild(img);
       } else if (extension === 'xlsx') {
+          const img = document.createElement('img');
+          img.src = '/static/xlsx.png';
+          img.alt = 'XLSX';
+          fileIcon.appendChild(img);
+      } else if (extension === 'docx') {
         const img = document.createElement('img');
-        img.src = '/static/xlsx.png';
-        img.alt = 'XLSX';
+        img.src = '/static/docx.png';
+        img.alt = 'DOCX';
+        fileIcon.appendChild(img);
+      } else if (extension === 'doc') {
+        const img = document.createElement('img');
+        img.src = '/static/docx.png';
+        img.alt = 'DOC';
+        fileIcon.appendChild(img);
+      } else if (extension === 'txt') {
+        const img = document.createElement('img');
+        img.src = '/static/txt.png';
+        img.alt = 'TXT';
+        fileIcon.appendChild(img);
+      } else if (extension === 'zip') {
+        const img = document.createElement('img');
+        img.src = '/static/zip.png';
+        img.alt = 'ZIP';
+        fileIcon.appendChild(img);
+      } else if (extension === 'mp4') {
+        const img = document.createElement('img');
+        img.src = '/static/mp4.png';
+        img.alt = 'MP4';
         fileIcon.appendChild(img);
       } else {
         // Use default SVG icon
@@ -461,7 +488,7 @@
     // Fetch file name on page load
     async function fetchFileName() {
       try {
-        const res = await fetch('/api/file_info');
+        const res = await fetch(`/api/file_info/${FOLDER_NAME}`);
         const data = await res.json();
         if (res.ok && data.filename) {
           fileName = data.filename;
@@ -696,8 +723,8 @@
     // Download button
     downloadBtn.addEventListener('click', () => {
       if (isAuthorized && fileName) {
-        // Download the file
-        window.location.href = '/api/download_file';
+        // Download the file з конкретної папки
+        window.location.href = `/api/download_file/${FOLDER_NAME}`;
       }
     });
 
