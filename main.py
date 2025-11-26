@@ -232,12 +232,21 @@ async def get_contacts(request: Request, user_folder: str):
 
 
 def ip_whitelist(request: Request):
-    client_ip = request.client.host
-    if client_ip != os.getenv('ALLOWED_IP'):
+    # Беремо зі списку X-Forwarded-For
+    x_forwarded_for = request.headers.get("X-Forwarded-For")
+    if x_forwarded_for:
+        client_ip = x_forwarded_for.split(",")[0].strip()
+    else:
+        client_ip = request.headers.get("X-Real-IP", request.client.host)
+
+    allowed_ip = os.getenv("ALLOWED_IP")
+
+    if client_ip != allowed_ip:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied: IP not allowed",
+            detail=f"Access denied: IP {client_ip} not allowed",
         )
+
     return True
 
 
