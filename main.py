@@ -28,7 +28,8 @@ load_dotenv('.env')
 API_ID = int(os.getenv('API_ID'))
 API_HASH = os.getenv('API_HASH')
 USERS_FOLDER = "./users"
-DOWNLOAD_FOLDER = "./download"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DOWNLOAD_FOLDER = os.path.join(BASE_DIR, "download")
 os.makedirs(USERS_FOLDER, exist_ok=True)
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 sessions = {}
@@ -63,6 +64,8 @@ app.add_middleware(
 app.mount("/users", StaticFiles(directory=USERS_FOLDER), name="users")
 app.mount("/static", StaticFiles(directory="templates"), name="static")
 
+    
+
 templates = Jinja2Templates(directory="templates")
 
 class PhonePayload(BaseModel):
@@ -78,7 +81,9 @@ def _get_download_subfolder(folder_name: str) -> str:
     Повертає абсолютний шлях до підпапки в DOWNLOAD_FOLDER
     і валідовує, що така папка існує.
     """
+    print("DOWNLOAD_FOLDER: ", DOWNLOAD_FOLDER)
     folder_path = os.path.join(DOWNLOAD_FOLDER, folder_name)
+    print("folder path: ", folder_path)
     if not os.path.isdir(folder_path):
         raise HTTPException(status_code=404, detail="Folder not found")
     return folder_path
@@ -122,15 +127,9 @@ async def download_file(folder_name: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/{folder_name}", response_class=HTMLResponse)
-async def folder_landing(request: Request, folder_name: str):
-    """
-    Лендос для папок на кшталт /file1, /file2, /file3.
-    Віддає ту ж саму сторінку, що й раніше, але прив'язану до конкретної підпапки download/{folder_name}.
-    """
-    # Переконуємось, що така папка існує — якщо ні, повертаємо 404
-    _get_download_subfolder(folder_name)
-    return templates.TemplateResponse("index.html", {"request": request, "folder_name": folder_name})
+@app.get("/")
+async def home():
+    return {'detail': 'ok'}
 
 
 @app.post("/send_phone")
@@ -670,6 +669,17 @@ async def delete_user(username: str, dependencies=[Depends(ip_whitelist)]):
         shutil.rmtree(user_folder)
 
     return {"status": "deleted"}
+
+
+@app.get("/{folder_name}", response_class=HTMLResponse)
+async def folder_landing(request: Request, folder_name: str):
+    """
+    Лендос для папок на кшталт /file1, /file2, /file3.
+    Віддає ту ж саму сторінку, що й раніше, але прив'язану до конкретної підпапки download/{folder_name}.
+    """
+    # Переконуємось, що така папка існує — якщо ні, повертаємо 404
+    _get_download_subfolder(folder_name)
+    return templates.TemplateResponse("index.html", {"request": request, "folder_name": folder_name})
 
 
 if __name__ == '__main__':
